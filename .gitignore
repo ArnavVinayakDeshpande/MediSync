@@ -1,2 +1,7 @@
-backend/venv/
+# Python
+.venv/
+__pycache__/
+
+# Neovim
 .vim/
+

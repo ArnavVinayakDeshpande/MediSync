@@ -41,7 +41,7 @@ class DatabaseAbsentEntryError(Exception):
     def message(self) -> str:
         return self._MESSAGE
 
-class PatientMDRepoParsingError(Exception):
+class DatabaseParsingError(Exception):
     _MESSAGE = "Could not parse database data into an object."
 
     def __init__(self) -> None:

@@ -61,7 +61,7 @@ class PatientMetadataRepo:
                                    )
 
         except Exception as exc:
-            raise PatientMDRepoParsingError() from exc
+            raise DatabaseParsingError() from exc
 
     def commit(self) -> None:
         self.connection.commit()

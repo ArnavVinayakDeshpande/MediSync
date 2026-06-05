@@ -34,11 +34,15 @@ class PatientMetadataRepo:
                                name TEXT NOT NULL,
                                dob TEXT,
                                number TEXT,
-                               is_active INT
+                               is_active INT,
+                               condition TEXT
                                )
                            """)
 
+            self.commit()
+
         except sql3.Error as exc:
+            self.connection.rollback()
             raise DatabaseExecutionError(exc)
 
         finally:
@@ -52,7 +56,8 @@ class PatientMetadataRepo:
             return PatientMetadata(name=data[1],
                                    dob=date_from_db_fmt(data[2]),
                                    number=data[3],
-                                   is_active=bool(data[4])
+                                   is_active=bool(data[4]),
+                                   condition=data[5]
                                    )
 
         except Exception as exc:
@@ -73,15 +78,17 @@ class PatientMetadataRepo:
                         name,
                         dob,
                         number,
-                        is_active
+                        is_active,
+                        condition
                         )
-                    VALUES (?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?)
                            """,
                            (patient_id,
                             patient_metadata.name,
                             date_to_db_fmt(patient_metadata.dob),
                             patient_metadata.number,
-                            int(patient_metadata.is_active)
+                            int(patient_metadata.is_active),
+                            patient_metadata.condition
                            )
                            )
 
@@ -164,13 +171,14 @@ class PatientMetadataRepo:
         try:
             cursor.execute("""
                     UPDATE patient_metadata
-                    SET name = ?, dob = ?, number = ?, is_active = ?
+                    SET name = ?, dob = ?, number = ?, is_active = ?, condition
                     WHERE pid = ?
                            """,
                            (patient_metadata.name,
                             date_to_db_fmt(patient_metadata.dob),
                             patient_metadata.number,
                             int(patient_metadata.is_active),
+                            patient_metadata.condition
                             patient_id
                            )
                            )

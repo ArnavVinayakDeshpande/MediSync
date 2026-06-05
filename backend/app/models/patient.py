@@ -15,6 +15,7 @@ class PatientMetadata:
     dob: datetime
     number: str
     is_active: bool
+    condition: MedicalCondition
 
 @dataclass
 class Patient:

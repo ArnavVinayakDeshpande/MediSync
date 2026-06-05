@@ -13,6 +13,6 @@ class Visit:
     prescription: str
     notes: str
     fees_paid: float
-    fees_remaining: float
+    fees_pending: float
     follow_up_date: datetime | None
 

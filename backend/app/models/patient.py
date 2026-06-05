@@ -1,22 +1,24 @@
 """
+
 """
 
-from .visit import Visit
-from .medical_condition import MedicalCondition
 from dataclasses import dataclass
 from datetime import datetime
 
+from .visit import Visit
+from .medical_condition import MedicalCondition
+
 
 @dataclass
-class Patient:
-    id: int
+class PatientMetadata:
     name: str
     dob: datetime
     number: str
     is_active: bool
-    total_fees_paid: float
-    fees_remaining: float
-    visits: list[Visit]
-    condition: MedicalCondition
 
+@dataclass
+class Patient:
+    id: int
+    metadata: PatientMetadata
+    visits: list[Visit]
 

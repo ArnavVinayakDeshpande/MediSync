@@ -48,7 +48,7 @@ class PatientVisitsRepo:
                                )
                            """)
 
-            self.commit()
+            await self.commit()
 
         except sql3.Error as exc:
             self.connection.rollback()
@@ -75,10 +75,10 @@ class PatientVisitsRepo:
         except Exception as exc:
             raise DatabaseParsingError() from exc
 
-    def commit(self) -> None:
+    async def commit(self) -> None:
         self.connection.commit()
 
-    def insert(self, 
+    async def insert(self, 
                patient_id: int,
                visit: Visit) -> None:
         cursor = self._get_cursor()
@@ -119,7 +119,7 @@ class PatientVisitsRepo:
         finally:
             cursor.close()
 
-    def delete(self, visit_id: int) -> None:
+    async def delete(self, visit_id: int) -> None:
         cursor = self._get_cursor()
 
         try:
@@ -138,7 +138,7 @@ class PatientVisitsRepo:
         finally:
             cursor.close()
 
-    def deleteall(self, patient_id: int) -> None:
+    async def deleteall(self, patient_id: int) -> None:
         cursor = self._get_cursor()
 
         try:
@@ -151,7 +151,7 @@ class PatientVisitsRepo:
         finally:
             cursor.close()
 
-    def get(self, visit_id: int) -> Visit | None:
+    async def get(self, visit_id: int) -> Visit | None:
         cursor = self._get_cursor()
 
         try:
@@ -169,7 +169,7 @@ class PatientVisitsRepo:
         finally:
             cursor.close()
 
-    def getall(self, patient_id: int) -> list[Visit]:
+    async def getall(self, patient_id: int) -> list[Visit]:
         cursor = self._get_cursor()
 
         try:
@@ -194,7 +194,7 @@ class PatientVisitsRepo:
         finally:
             cursor.close()
 
-    def update(self, visit: Visit) -> None:
+    async def update(self, visit: Visit) -> None:
         cursor = self._get_cursor()
 
         try:

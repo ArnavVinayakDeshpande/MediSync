@@ -4,6 +4,15 @@
 from sqlite3 import Error as sql3_error
 
 
+class DatabaseDisconnectedError(Exception):
+    _MESSAGE = "Could not connect to the database."
+
+    def __init__(self) -> None:
+        super().__init__(self._MESSAGE)
+
+    def message(self) -> str:
+        return self._MESSAGE
+
 class DatabaseCursorError(Exception):
     _MESSAGE = "Could not fetch database cursor."
 

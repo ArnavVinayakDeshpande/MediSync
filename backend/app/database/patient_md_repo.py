@@ -39,7 +39,7 @@ class PatientMetadataRepo:
                                )
                            """)
 
-            self.commit()
+            await self.commit()
 
         except sql3.Error as exc:
             self.connection.rollback()
@@ -63,10 +63,10 @@ class PatientMetadataRepo:
         except Exception as exc:
             raise DatabaseParsingError() from exc
 
-    def commit(self) -> None:
+    async def commit(self) -> None:
         self.connection.commit()
 
-    def insert(self,
+    async def insert(self,
                patient_id: int,
                patient_metadata: PatientMetadata) -> None:
         cursor = self._get_cursor()
@@ -101,7 +101,7 @@ class PatientMetadataRepo:
         finally:
             cursor.close()
 
-    def delete(self, patient_id: int) -> None:
+    async def delete(self, patient_id: int) -> None:
         cursor = self._get_cursor()
 
         try:
@@ -120,7 +120,7 @@ class PatientMetadataRepo:
         finally:
             cursor.close()
 
-    def get(self, patient_id: int) -> PatientMetadata | None:
+    async def get(self, patient_id: int) -> PatientMetadata | None:
         cursor = self._get_cursor()
 
         try:
@@ -140,7 +140,7 @@ class PatientMetadataRepo:
         finally:
             cursor.close()
 
-    def getall(self) -> list[PatientMetadata]:
+    async def getall(self) -> list[PatientMetadata]:
         cursor = self._get_cursor()
 
         try:
@@ -163,7 +163,7 @@ class PatientMetadataRepo:
         finally:
             cursor.close()
 
-    def update(self,
+    async def update(self,
                patient_id: int,
                patient_metadata: PatientMetadata) -> None:
         cursor = self._get_cursor()

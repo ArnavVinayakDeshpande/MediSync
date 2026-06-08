@@ -5,7 +5,7 @@ import sqlite3 as sql3
 from pathlib import Path
 
 from .exceptions import *
-from .patient_md_repo import PatientMetadatRepo
+from .patient_repo import PatientRepository
 from .patient_visits_repo import PatientVisitsRepo
 
 
@@ -14,7 +14,7 @@ class Database:
         self.filepath = filepath
 
         self.connection = None
-        self.patient_md_repo = None
+        self.patient_repo = None
         self.patient_visits_repo = None
 
         try:
@@ -24,7 +24,7 @@ class Database:
             raise DatabaseDisconnectedError() from exc
 
         else:
-            self.patient_md_repo = PatientMetadataRepo(self.connection)
+            self.patient_repo = PatientMetadataRepo(self.connection)
             self.patient_visits_repo = PatientVisitsRepo(self.connection)
 
 database: Database | None = None

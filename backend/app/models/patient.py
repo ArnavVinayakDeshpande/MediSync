@@ -11,16 +11,11 @@ from app.common.converter import date_to_json_fmt, date_from_json_fmt
 
 
 @dataclass
-class PatientMetadata:
+class Patient:
+    id: int
     name: str
-    dob: _date 
+    dob: _date | None
     number: str
     condition: MedicalCondition
     is_active: bool
-
-@dataclass
-class Patient:
-    id: int
-    metadata: PatientMetadata
-    visits: list[Visit]
 

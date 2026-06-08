@@ -30,7 +30,7 @@ class PMDuplicateEntryError(Exception):
         return self._MESSAGE
 
 class PMAbsentEntryError(Exception):
-    _MESSAGE = "No patient with the given ID."
+    _MESSAGE = "Patient with this ID does not exist."
 
     def __init__(self) -> None:
         super().__init__(self._MESSAGE)

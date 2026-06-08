@@ -2,165 +2,92 @@
 """
 
 import sqlite3 as sql3
-from models.patient import *
+
 from .exceptions import *
+from app.models.patient import Patient
 from app.common.converter import *
 
 
-class PatientRepoParseError(Exception):
-    _MESSAGE = "Failed to parse patient information from database."
-
-    def __init__(self) -> None:
-        super().__init__(self._MESSAGE)
-
-    def message(self) -> str:
-        return self._MESSAGE
-
 class PatientRepository:
-    def __init__(self, connection: sql3.Connection) -> None:
-        self.connection: sql3.Connection = connection
+    def __init__(self, connection: sql3.Connection):
+        self.connection = connection
 
-        await self._ensure_initialized()
+        self._ensure_initialized()
 
-    def _get_cursor(self) -> sql3.Cursor:
-        cursor = self.connection.cursor()
-
-        if cursor is None:
-            raise DatabaseCursorError()
-
-        return cursor
-
-    def _create_visit(self, data) -> Visit:
+    def _get_cursor(self):
         try:
-            visit = Visit(id=data[0],
-                          date=converter.date_from_db_fmt(data[2]),
-                          diagnosis=data[3],
-                          prescription=data[4],
-                          notes=data[5],
-                          fees_paid=float(data[6]),
-                          fees_remaining=float(data[7]),
-                          follow_up_date=converter.date_from_db_fmt(data[8])
-                          )
-            return visit
+            return self.connection.cursor()
 
-        except:
-            raise PatientRepoParseError()
+        except sql3.Error as exc:
+            raise DatabaseCursorError() from exc
 
-    def _create_patient(self, data_pat, data_visit) -> Patient:
-        try:
-            visits = []
-
-            for visit_data in data_visit:
-                visits.append(self._create_visit(visit_data))
-
-            patient = Patient(id=data_pat[0],
-                              name=data_pat[1],
-                              dob=converter.date_from_db_fmt(data[2]),
-                              number=data_pat[3],
-                              is_active=bool(data_pat[4]),
-                              total_fees_paid=str(data_pat[5]),
-                              fees_remaining=str(data_pat[6]),
-                              condition=data_pat[7],
-                              visits=visits)
-
-            return patient
-
-        except:
-            raise PatientRepoParseError()
-
-    def _ensure_initialized(self) -> None:
+    def _ensure_initialized(self):
         cursor = self._get_cursor()
 
         try:
-            cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS patients (
-                        id INT PRIMARY KEY UNIQUE,
-                        name TEXT NOT NULL,
-                        dob TEXT,
-                        number TEXT NOT NULL UNIQUE,
-                        is_active INT,
-                        total_fees_paid TEXT NOT NULL,
-                        fees_remaining TEXT NOT NULL,
-                        condition TEXT,
-                        num_visits INT
-                        )
-                           """)
+            cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS 
+                           patients (
+                               id INT PRIMARY KEY,
+                               name TEXT NOT NULL,
+                               dob TEXT,
+                               number TEXT UNIQUE,
+                               condition TEXT,
+                               is_active INT
+                               )
+                    """)
 
-            cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS visits (
-                        id INT PRIMARY KEY UNIQUE ,
-                        patient_id INT,
-                        date TEXT NOT NULL,
-                        diagnosis TEXT,
-                        prescription TEXT,
-                        notes TEXT,
-                        fees_paid TEXT NOT NULL,
-                        fees_remaining TEXT NOT NULL,
-                        follow_up_date TEXT
-                        )
-                           """)
-
-        except sql3.Error as exc:
-            raise DatabaseExecutionError(exc)
-
-        else:
             self.commit()
 
+        except sql3.Error as exc:
+            raise DatabaseExecutionError(exc)
+
         finally:
             cursor.close()
 
-    def insert(self, patient: Patient) -> None:
-        cursor = self._get_cursor()
+    def _create_patient(self, data: tuple | None) -> Patient | None:
+        if not data:
+            return None
 
         try:
-            # Insert into patients table
-            cursor.execute("""
+            return Patient(
+                    id = data[0],
+                    name = data[1],
+                    dob = date_from_db_fmt(data[2]),
+                    number = data[3],
+                    condition = data[4],
+                    is_active = data[5]
+                    )
+
+        except Exception as exc:
+            raise DatabaseParsingError() from exc
+
+    def insert(self, patient: Patient):
+        cursor = self._get_cursor() 
+
+        try:
+            cursor.execute(
+                    """
                     INSERT INTO patients (
-                        id, name, dob, number,
-                        is_active, total_fees_paid,
-                        fees_remaining, condition,
-                        num_visits
+                        id, 
+                        name,
+                        dob,
+                        number,
+                        condition,
+                        is_active
                         )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                           """,
-                           (
-                               patient.id,
-                               patient.name,
-                               converter.date_to_db_fmt(patient.dob),
-                               patient.number,
-                               patient.is_active,
-                               str(patient.total_fees_paid),
-                               str(patient.fees_remaining),
-                               condition,
-                               len(patient.visits)
-                               )
-                           )
-
-            # Insert any visits
-            for visit in patient.visits:
-                cursor.execute("""
-                        INSERT INTO visits (
-                            id, patient_id, date,
-                            diagnosis, prescription, notes,
-                            fees_paid, fees_remaining, follow_up_date
-                            )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                               """,
-                               (
-                                   visit.id,
-                                   patient.id,
-                                   converter.date_to_db_fmt(visit.date),
-                                   visit.diagnosis,
-                                   visit.prescription,
-                                   visit.notes,
-                                   str(visit.fees_paid),
-                                   str(visit.fees_remaining),
-                                   converter.date_to_db_fmt(visit.follow_up_date)
-                                   )
-                               )
-
-        except sql3.IntegrityError:
-            raise DatabaseDuplicateEntryError()
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        patient.id,
+                        patient.name,
+                        date_to_db_fmt(patient.dob),
+                        patient.number,
+                        patient.condition,
+                        int(patient.is_active)
+                        )
+                    )
 
         except sql3.Error as exc:
             raise DatabaseExecutionError(exc)
@@ -168,23 +95,16 @@ class PatientRepository:
         finally:
             cursor.close()
 
-    def delete(self, patient_id: int) -> None:
+    def delete(self, patient_id: int):
         cursor = self._get_cursor()
 
         try:
-            # Delete the patient
-            cursor.execute("""
+            cursor.execute(
+                    """
                     DELETE FROM patients WHERE id = ?
-                           """,
-                           (patient_id)
-                           )
-
-            # Delete the visits
-            cursor.execute("""
-                    DELETE FROM visits WHERE patient_id = ?
-                           """,
-                           (patient_id)
-                           )
+                    """,
+                    (patient_id,)
+                    )
 
             if cursor.rowcount == 0:
                 raise DatabaseAbsentEntryError()
@@ -195,42 +115,15 @@ class PatientRepository:
         finally:
             cursor.close()
 
-    def update(self, patient: Patient) -> None:
+    def clear(self):
         cursor = self._get_cursor()
 
         try:
-            # Get all visit ids 
-            cursor.execute("""
-                    SELECT id FROM visits WHERE patient_id = ?
-                           """,
-                           (patient.id)
-                           )
-            
-
-            # Update patient
-            cursor.execute("""
-                    UPDATE patients 
-                    SET name = ?, dob = ?, number = ?,
-                        is_active = ?, total_fees_paid = ?, 
-                        fees_remaining = ?, condition = ?
-                    WHERE id = ?
-                           """,
-                           (
-                               patient.name,
-                               converter.date_to_db_fmt(patient.dob),
-                               patient.number,
-                               patient.is_active,
-                               str(patient.total_fees_paid),
-                               str(patient.fees_remaining),
-                               patient.condition
-                               )
-                           )
-
-
-            # Update visits
-
-            if cursor.rowcount == 0:
-                raise DatabaseAbsentEntryError()
+            cursor.execute(
+                    """
+                    DELETE * FROM patients
+                    """
+                    )
 
         except sql3.Error as exc:
             raise DatabaseExecutionError(exc)
@@ -242,26 +135,16 @@ class PatientRepository:
         cursor = self._get_cursor()
 
         try:
-            # Select from patients
-            cursor.execute("""
+            cursor.execute(
+                    """
                     SELECT * FROM patients WHERE id = ?
-                           """,
-                           (patient_id)
-                           )
+                    """,
+                    (patient_id,)
+                    )
 
-            patient_data = cursor.fetchone()
+            data = cursor.fetchone()
 
-            # Select from visits
-            cursor.execute("""
-                    SELECT * from visits WHERE patient_id = ?
-                           """,
-                           (patient_id)
-                           )
-
-            visits_data = cursor.fetchall()
-            patient_data = cursor.fetchone()
-
-            return self._create_patient(patient_data, visits_data)
+            return self._create_patient(data)
 
         except sql3.Error as exc:
             raise DatabaseExecutionError(exc)
@@ -269,9 +152,84 @@ class PatientRepository:
         finally:
             cursor.close()
 
-    def get_visits(self, patient_id: int) -> list[Visit]:
-        pass
+    def getall(self) -> list[Patient]:
+        cursor = self._get_cursor()
 
-    def commit(self) -> None:
-        self.connection.commit() 
+        try:
+            cursor.execute(
+                    """
+                    SELECT * FROM patients
+                    """
+                    )
+
+            data = cursor.fetchall()
+
+            patients = []
+
+            for d in data:
+                patients.append(self._create_patient(d))
+
+            return patients
+
+        except sql3.Error as exc:
+            raise DatabaseExecutionError(exc)
+
+        finally:
+            cursor.close()
+
+    def getids(self) -> list[int]:
+        cursor = self._get_cursor()
+
+        try:
+            cursor.execute(
+                    """
+                    SELECT id FROM patients
+                    """
+                    )
+
+            return [row[0] for row in cursor.fetchall()]
+
+        except sql3.Error as exc:
+            raise DatabaseExecutionError(exc)
+
+    def update(self, patient: Patient):
+        cursor = self._get_cursor()
+
+        try:
+            cursor.execute(
+                    """
+                    UPDATE patients
+                    SET 
+                        name = ?,
+                        dob = ?,
+                        number = ?,
+                        condition = ?,
+                        is_active = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        patient.name,
+                        date_to_db_fmt(patient.dob),
+                        patient.number,
+                        patient.condition,
+                        int(patient.is_active),
+                        patient.id
+                        )
+                    )
+
+            if cursor.rowcount == 0:
+                raise DatabaseAbsentEntryError()
+
+        except sql3.Error as exc:
+            raise DatabaseExecutionError(exc)
+
+        finally:
+            cursor.close()
+
+    def commit(self):
+        try:
+            self.connection.commit()
+
+        except sql3.Error as exc:
+            raise DatabaseExecutionError(exc)
 

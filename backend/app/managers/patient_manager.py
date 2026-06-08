@@ -2,7 +2,7 @@
 
 """
 
-from datetime import datetime
+from datetime import date as _date
 
 from app.models.patient import Patient
 from app.models.visit import Visit
@@ -50,9 +50,52 @@ class PatientManager:
 
         # Maybe something for date as well
 
+    def _validate_visit(self, fees_paid: float, fees_pending: float) -> None:
+        if fees_paid < 0 or fees_pending < 0:
+            raise PMInvalidInputsError()
+
+    def _create_metadata(self,
+                         name: str,
+                         dob: _date,
+                         number: str,
+                         condition: MedicalCondition,
+                         is_active: bool) -> PatientMetadata, int:
+
+        self._validate_metadata(name, dob, number)
+
+        id = 0
+
+        return PatientMetadata(name=name,
+                               dob=dob,
+                               number=number,
+                               condition=condition,
+                               is_active=is_active), id
+
+    def _create_visit(self,
+                      id: int,
+                      date: _date,
+                      diagnosis: str,
+                      prescription: str,
+                      notes: str,
+                      fees_paid: float,
+                      fees_pending: float,
+                      follow_up_date: _date | None) -> Visit:
+        self._validate_visit(fees_paid, fees_pending)
+
+        id = 0
+
+        return Visit(id=id,
+                     date=date,
+                     diagnosis=diagnosis,
+                     prescription=prescription,
+                     notes=notes,
+                     fees_paid=fees_paid,
+                     fees_pending=fees_pending,
+                     follow_up_date=follow_up_date)
+
     def create_patient_metadata(self,
                        name: str,
-                       dob: datetime,
+                       dob: _date,
                        number: str,
                        condition: MedicalCondition,
                        is_active: bool = True,
@@ -62,13 +105,7 @@ class PatientManager:
 
         self._validate_metadata(name, dob, number)
 
-        id = 0 
-        
-        patient_metadata = PatientMetadata(name=name,
-                                           dob=dob,
-                                           number=number,
-                                           condition=condition,
-                                           is_active=is_active)
+        patient_metadata, id  = self._create_metadata(name, dob, number, condition, is_active)
 
         try:
             self._metadata_repo.insert(patient_id=id,
@@ -84,15 +121,29 @@ class PatientManager:
             self._metadata_repo.commit()
 
     def create_visit(self,
-                     date: datetime,
+                     patient_id: int,
+                     date: _date,
                      diagnosis: str,
                      prescription: str,
                      notes: str,
                      fees_paid: float,
                      fees_pending: float,
-                     follow_up_date = datetime | None):
-        # TODO: Change datetime to date everywhere
-        pass
+                     follow_up_date = _date | None):
+        self._validate()
+
+        visit = self._visit()
+
+        try:
+             
+
+        except DatabaseCursorError, DatabaseExecutionError as exc:
+            raise PMDatabaseError from exc
+
+        except DatabaseDuplicateEntryError:
+            raise PMDuplicateEntryError()
+
+        else:
+            self._visits_repo.commit()
 
     def create_patient(self):
         pass

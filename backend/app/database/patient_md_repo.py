@@ -56,7 +56,7 @@ class PatientMetadataRepo:
             return PatientMetadata(name=data[1],
                                    dob=date_from_db_fmt(data[2]),
                                    number=data[3],
-                                   condition=data[4].
+                                   condition=data[4],
                                    is_active=bool(data[5])
                                    )
 

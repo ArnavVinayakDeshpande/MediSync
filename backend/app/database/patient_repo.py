@@ -69,7 +69,7 @@ class PatientRepository:
         except:
             raise PatientRepoParseError()
 
-    async def _ensure_initialized(self) -> None:
+    def _ensure_initialized(self) -> None:
         cursor = self._get_cursor()
 
         try:
@@ -110,7 +110,7 @@ class PatientRepository:
         finally:
             cursor.close()
 
-    async def insert(self, patient: Patient) -> None:
+    def insert(self, patient: Patient) -> None:
         cursor = self._get_cursor()
 
         try:
@@ -169,7 +169,7 @@ class PatientRepository:
         finally:
             cursor.close()
 
-    async def delete(self, patient_id: int) -> None:
+    def delete(self, patient_id: int) -> None:
         cursor = self._get_cursor()
 
         try:
@@ -196,7 +196,7 @@ class PatientRepository:
         finally:
             cursor.close()
 
-    async def update(self, patient: Patient) -> None:
+    def update(self, patient: Patient) -> None:
         cursor = self._get_cursor()
 
         try:
@@ -239,7 +239,7 @@ class PatientRepository:
         finally:
             cursor.close()
 
-    async def get(self, patient_id: int) -> Patient | None:
+    def get(self, patient_id: int) -> Patient | None:
         cursor = self._get_cursor()
 
         try:
@@ -270,9 +270,9 @@ class PatientRepository:
         finally:
             cursor.close()
 
-    async def get_visits(self, patient_id: int) -> list[Visit]:
+    def get_visits(self, patient_id: int) -> list[Visit]:
         pass
 
-    async def commit(self) -> None:
+    def commit(self) -> None:
         self.connection.commit() 
 

@@ -1,18 +1,18 @@
 """
 """
 
-from datetime import datetime
+from datetime import date as _date
 from dataclasses import dataclass
 
 
 @dataclass
 class Visit:
     id: int
-    date: datetime
+    date: _date
     diagnosis: str
     prescription: str
     notes: str
     fees_paid: float
     fees_pending: float
-    follow_up_date: datetime | None
+    follow_up_date: _date | None
 

@@ -3,7 +3,7 @@
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date
 
 from .visit import Visit
 from .medical_condition import MedicalCondition
@@ -12,7 +12,7 @@ from .medical_condition import MedicalCondition
 @dataclass
 class PatientMetadata:
     name: str
-    dob: datetime
+    dob: _date 
     number: str
     condition: MedicalCondition
     is_active: bool

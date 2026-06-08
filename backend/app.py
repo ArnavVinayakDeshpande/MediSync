@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleWare
 
 from database.database import database
 from managers.patient_manager import patient_manager
+from routers.patient import router as patient_router
 
 
 def main():
@@ -26,6 +27,7 @@ def main():
                        )
 
     # Include the routers
+    app.include_router(patient_router)
 
     # Create database
     database = Database("")

@@ -50,7 +50,7 @@ def create(data: Body(...)):
                 detail = "Patient with same ID / number already exists."
                 )
 
-    except KeyError, ValueError, PMInvalidInputsError:
+    except (KeyError, ValueError, PMInvalidInputsError):
         raise HTTPException(
                 status_code = 400,
                 detail = "Invalid input format for data."

@@ -20,7 +20,7 @@ class PatientManager:
         try:
             ids = self._repo.getids()
 
-            return max(ids) + 1
+            return max(ids) + 1 if ids else 1
 
         except (DatabaseCursorError, DatabasExecutionError) as exc:
             raise PMDatabaseError() from exc
@@ -42,7 +42,7 @@ class PatientManager:
         try:
             _ = int(number)
 
-        except:
+        except Exception:
             raise PMInvalidInputsError()
 
     def _create_patient(
@@ -54,11 +54,11 @@ class PatientManager:
             is_active: bool) -> Patient:
         self._validate_inputs(name, dob, number)
 
-        id = self._last_id
+        patient_id = self._last_id
         self._last_id += 1
 
         return Patient(
-                id = id,
+                id = patient_id,
                 name = name,
                 dob = dob,
                 number = number,
@@ -86,7 +86,7 @@ class PatientManager:
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
             self._rollback_id()
-            raise PMDatabaseError()
+            raise PMDatabaseError() from exc
 
         except DatabaseDuplicateEntryError:
             self._rollback_id()
@@ -129,7 +129,7 @@ class PatientManager:
         try:
             return self._repo.get(patient_id)
 
-        except (DatabaseCursorError, DatabaseExcutionError) as exc:
+        except (DatabaseCursorError, DatabaseExecutionError) as exc:
             raise PMDatabaseError() from exc
 
     def getall(self):

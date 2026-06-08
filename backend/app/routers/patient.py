@@ -14,84 +14,132 @@ from app.common.converter import *
 
 
 router = APIRouter(
-        prefix="/patients",
-        tags=["Patients"]
+        prefix = "/patients",
+        tags = ["Patients"]
         )
 
-# Add
+# Create
 @router.post("")
-def add_patient(data: Body(...)):
-    if patient_manager is None:
-        raise HTTPException(status_code=500,
-                            detail="Could not access internal database.")
+def create(data: Body(...)):
+    if not patient_manager:
+        raise HTTPException(
+                status_code = 500,
+                detail = "Could not access internal database."
+                )
 
     try:
-        patient_manager.create_patient_metadata(name=data["name"],
-                                                dob=date_from_json_fmt(data["dob"]),
-                                                number=data["number"],
-                                                condition=MedicalCondition(data["condition"]),
-                                                is_active=data["is_active"]
-                                                )
+        created_id = patient_manager.create(
+                name = data["name"],
+                dob = date_from_json_fmt(data["dob"]),
+                number = data["number"],
+                condition = data["condition"],
+                is_active = data["is_active"]
+                ) 
 
-    except KeyError, PMInvalidInputsError:
-        raise HTTPException(status_code=400,
-                            detail="Information given in an invalid format.")
+        return {"patient_id": created_id, "success": True}
 
     except PMDatabaseError:
-        raise HTTPException(status_code=500,
-                            detail="Could not access internal database.")
+        raise HTTPException(
+                status_code = 500,
+                detail = "Could not access internal database."
+                )
 
     except PMDuplicateEntryError:
-        raise HTTPException(status_code=409,
-                            detail="Given patient with id/number already exists.")
+        raise HTTPException(
+                status_code = 409,
+                detail = "Patient with same ID / number already exists."
+                )
 
-    return {"success": True}
+    except KeyError, ValueError, PMInvalidInputsError:
+        raise HTTPException(
+                status_code = 400,
+                detail = "Invalid input format for data."
+                )
 
 @router.delete("/{patient_id}")
-def delete_patient(patient_id: int):
-    if patient_manager is None:
-        raise HTTPException(status_code=500,
-                            detail="Could not access internal database.")
+def delete(patient_id: int):
+    if not patient_manager:
+        raise HTTPException(
+                status_code = 500,
+                detail = "Could not access internal database."
+                )
 
     try:
-        patient_manager.delete(patient_id)
+        patient_manager.delete(patient_id) 
 
     except PMDatabaseError:
-        raise HTTPException(status_code=500,
-                            detail="Could not access internal database.")
+        raise HTTPException(
+                status_code = 500,
+                detail = "Could not access internal database."
+                )
 
     except PMAbsentEntryError:
-        raise HTTPException(status_code=404,
-                            detail="Could not find the patient requested.")
-
-    return {"success": True}
-
-@router.patch("/{patient_id}")
-def patch_patient(patient_id: int):
-    pass
+        raise HTTPException(
+                status_code = 404,
+                detail = "Could not find the patient with the given id."
+                )
 
 @router.get("/{patient_id}")
-def get_patient(patient_id: int):
-    if patient_manager is None:
-        raise HTTPException(status_code=500,
-                            detail="Could not access internal database.")
+def get(patient_id: int):
+    if not patient_manager:
+        raise HTTPException(
+                status_code = 500,
+                detail = "Could not access internal database."
+                )
 
     try:
-        data = patient_manager.get_patient_metadata(patient_id)
+        data = patient_manager.get(patient_id)
 
-        if data is None:
-            raise HTTPException(status_code=404,
-                                detail="Could not find the patient requested.")
-        
-        return patient_metadata_to_json_fmt(patient_id, data)
+        if data:
+            return patient_to_json_fmt(data)
 
-    except PMDatabaseError:
-        raise HTTPException(status_code=500,
-                            detail="Could not access internal database.")
+        raise HTTPException(
+                status_code=404,
+                detail = "Could not find the patient with the given id."
+                )
+
+    except PMDatabaseError as exc:
+        raise HTTPException(
+                status_code=500,
+                detail = "Could not access internal database."
+                )
 
 @router.get("")
-def get_all_patients():
-    if patient_manager is None:
-        raise HTTPException(status_code=500,
-                            detail="Could not access internal database.")
+def getall():
+    if not patient_manager:
+        raise HTTPException(
+                status_code = 500,
+                detail = "Could not access internal database."
+                )
+
+    try:
+        data = patient_manager.getall()
+
+        if data:
+            return [patient_to_json_fmt(d) for d in data]
+
+        return []
+    
+    except PMDatabaseError:
+        raise HTTPException(
+                status_code = 500,
+                detail = "Could not access internal database."
+                )
+
+@router.patch("/{patient_id}")
+def update(patient_id: int, data: Body(...)):
+    if not patient_manager:
+        raise HTTPException(
+                status_code = 500,
+                detail = "Could not acess internal database."
+                )
+
+    try:
+        pass
+
+    except PMDatabaseError:
+        raise HTTPException(
+                status_code = 500,
+                detail = "Could not access internal database."
+                )
 

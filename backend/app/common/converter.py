@@ -19,13 +19,20 @@ def date_to_json_fmt(dt: date | None) -> str | None:
 def date_from_json_fmt(dt: str | None) -> date | None:
     return datetime.strptime("%d-%m-%Y") if dt else None
 
-def patient_metadata_to_json_fmt(pid: int, pmd: PatientMetadata) -> dict:
+def patient_to_json_fmt(patient: Patient) -> dict:
     return {
-            "id": pid,
-            "name": pmd.name,
-            "dob": date_to_json_fmt(pmd.dob),
-            "number": pmd.number,
-            "condition": pmd.condition,
-            "is_active": pmd.is_active
+            "id": patient.id,
+            "name": patient.name,
+            "dob": date_to_json_fmt(patient.dob),
+            "number": patient.number,
+            "condition": patient.condition,
+            "is_active": patient.is_active
             }
+
+def patient_from_json_fmt(data: dict) -> Patient:
+    try:
+        pass
+
+    except KeyError:
+        pass
 

@@ -1,6 +1,8 @@
 """
 """
 
+from datetime import date
+
 from app.database.database import Database
 from app.database.patient_repo import PatientRepository
 
@@ -32,18 +34,27 @@ class PatientManager:
         if self._repo is None:
             raise PMDatabaseError()
 
-    def _validate_inputs(self, name: str, dob: date | None, number: str):
-        if not name or not number:
-            raise PMInvalidInputsError()
+    def _validate_inputs(
+            self,
+            name: str | None,
+            dob: date | None,
+            number: str | None):
+        if name is not None:
+            if not name:
+                raise PMInvalidInputsError()
 
-        if len(number) != 10:
-            raise PMInvalidInputsError()
+        if number is not None:
+            if not number:
+                raise PMInvalidInputsError()
 
-        try:
-            _ = int(number)
+            if len(number) != 10:
+                raise PMInvalidInputsError()
 
-        except Exception:
-            raise PMInvalidInputsError()
+            try:
+                _ = int(number)
+
+            except:
+                raise PMInvalidInputsError()
 
     def _create_patient(
             self,
@@ -51,13 +62,13 @@ class PatientManager:
             dob: date | None,
             number: str,
             condition: str,
-            is_active: bool) -> Patient:
+            is_active: bool) -> tuple[int, Patient]:
         self._validate_inputs(name, dob, number)
 
         patient_id = self._last_id
         self._last_id += 1
 
-        return Patient(
+        return patient_id, Patient(
                 id = patient_id,
                 name = name,
                 dob = dob,
@@ -72,17 +83,15 @@ class PatientManager:
             dob: date | None,
             number: str,
             condition: str,
-            is_active: bool):
+            is_active: bool) -> int:
         self._validate()
 
         try:
-            self._repo.insert(self._create_patient(
-                name,
-                dob,
-                number,
-                condition,
-                is_active
-                ))
+            patient_id, patient = self._create_patient(
+                    name, dob, number, condition, is_active
+                    )
+
+            self._repo.insert(patient)
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
             self._rollback_id()
@@ -94,6 +103,7 @@ class PatientManager:
 
         else:
             self._repo.commit()
+            return patient_id
 
 
     def delete(self, patient_id: int):
@@ -141,10 +151,30 @@ class PatientManager:
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
             raise PMDatabaseError() from exc
 
-    def update(self, patient: Patient):
+    def update(
+            self,
+            patient_id: int,
+            name: str | None = None,
+            dob: date | None = None,
+            number: str | None = None,
+            condition: MedicalCondition | None = None,
+            is_active: bool | None = None):
         self._validate()
 
         try:
+            self._validate_inputs(name, dob, number)
+
+            patient = self.get(patient_id)
+
+            if patient is None:
+                raise PMAbsentEntryError()
+
+            patient.name = name if name else patient.name
+            patient.dob = dob if dob else patient.dob
+            patient.number = number if dob else patient.number
+            patient.condition = condition if condition else patient.condition
+            patient.is_active = is_active if is_active else patient.is_active
+
             self._repo.update(patient)
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:

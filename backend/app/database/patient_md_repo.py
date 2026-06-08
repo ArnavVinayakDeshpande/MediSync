@@ -34,12 +34,12 @@ class PatientMetadataRepo:
                                name TEXT NOT NULL,
                                dob TEXT,
                                number TEXT,
-                               is_active INT,
-                               condition TEXT
+                               condition TEXT,
+                               is_active INT
                                )
                            """)
 
-            await self.commit()
+            self.commit()
 
         except sql3.Error as exc:
             self.connection.rollback()
@@ -56,17 +56,17 @@ class PatientMetadataRepo:
             return PatientMetadata(name=data[1],
                                    dob=date_from_db_fmt(data[2]),
                                    number=data[3],
-                                   is_active=bool(data[4]),
-                                   condition=data[5]
+                                   condition=data[4].
+                                   is_active=bool(data[5])
                                    )
 
         except Exception as exc:
             raise DatabaseParsingError() from exc
 
-    async def commit(self) -> None:
+    def commit(self) -> None:
         self.connection.commit()
 
-    async def insert(self,
+    def insert(self,
                patient_id: int,
                patient_metadata: PatientMetadata) -> None:
         cursor = self._get_cursor()
@@ -78,8 +78,8 @@ class PatientMetadataRepo:
                         name,
                         dob,
                         number,
-                        is_active,
-                        condition
+                        condition,
+                        is_active
                         )
                     VALUES (?, ?, ?, ?, ?, ?)
                            """,
@@ -87,8 +87,8 @@ class PatientMetadataRepo:
                             patient_metadata.name,
                             date_to_db_fmt(patient_metadata.dob),
                             patient_metadata.number,
-                            int(patient_metadata.is_active),
-                            patient_metadata.condition
+                            patient_metadata.condition,
+                            int(patient_metadata.is_active)
                            )
                            )
 
@@ -101,7 +101,7 @@ class PatientMetadataRepo:
         finally:
             cursor.close()
 
-    async def delete(self, patient_id: int) -> None:
+    def delete(self, patient_id: int) -> None:
         cursor = self._get_cursor()
 
         try:
@@ -120,7 +120,7 @@ class PatientMetadataRepo:
         finally:
             cursor.close()
 
-    async def get(self, patient_id: int) -> PatientMetadata | None:
+    def get(self, patient_id: int) -> PatientMetadata | None:
         cursor = self._get_cursor()
 
         try:
@@ -140,7 +140,7 @@ class PatientMetadataRepo:
         finally:
             cursor.close()
 
-    async def getall(self) -> list[PatientMetadata]:
+    def getall(self) -> list[PatientMetadata]:
         cursor = self._get_cursor()
 
         try:
@@ -163,7 +163,7 @@ class PatientMetadataRepo:
         finally:
             cursor.close()
 
-    async def update(self,
+    def update(self,
                patient_id: int,
                patient_metadata: PatientMetadata) -> None:
         cursor = self._get_cursor()
@@ -171,14 +171,14 @@ class PatientMetadataRepo:
         try:
             cursor.execute("""
                     UPDATE patient_metadata
-                    SET name = ?, dob = ?, number = ?, is_active = ?, condition
+                    SET name = ?, dob = ?, number = ?, condition = ?, is_active = ?
                     WHERE pid = ?
                            """,
                            (patient_metadata.name,
                             date_to_db_fmt(patient_metadata.dob),
                             patient_metadata.number,
+                            patient_metadata.condition,
                             int(patient_metadata.is_active),
-                            patient_metadata.condition
                             patient_id
                            )
                            )

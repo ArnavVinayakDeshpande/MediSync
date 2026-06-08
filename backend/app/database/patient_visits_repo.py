@@ -25,9 +25,9 @@ class PatientVisitsRepo:
         cursor = self._get_cursor()
 
         try:
-            cursor.execute("""
-                    PRAGMA FOREIGN_KEYS = ON
-                           """)
+            self.connection.execute("""
+                            PRAGMA foreign_keys = ON
+                                    """)
 
             cursor.execute("""
                     CREATE TABLE IF NOT EXISTS

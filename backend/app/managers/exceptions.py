@@ -28,4 +28,13 @@ class PMDuplicateEntryError(Exception):
 
     def message(self) -> str:
         return self._MESSAGE
+
+class PMAbsentEntryError(Exception):
+    _MESSAGE = "No patient with the given ID."
+
+    def __init__(self) -> None:
+        super().__init__(self._MESSAGE)
+
+    def message(self) -> str:
+        return self._MESSAGE
     

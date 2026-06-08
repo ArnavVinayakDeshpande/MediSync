@@ -65,7 +65,6 @@ class PatientRepository:
 
             return patient
 
-
         except:
             raise PatientRepoParseError()
 

@@ -192,3 +192,24 @@ class PatientMetadataRepo:
         finally:
             cursor.close()
 
+    def exists(self, patient_id: int) -> bool:
+        cursor = self._get_cursor()
+
+        try:
+            cursor.execute("""
+                    SELECT * FROM patient_metadata WHERE pid = ?
+                           """,
+                           (patient_id,)
+                           )
+
+            if data is None:
+                return False
+
+            return True
+
+        except sql3.Error as exc:
+            raise DatabaseExecutionError(exc)
+
+        finally:
+            cursor.close()
+

@@ -7,7 +7,7 @@ from datetime import date as _date
 from app.models.patient import Patient
 from app.models.visit import Visit
 from app.models.medical_condition import MedicalCondition
-from app.database.database import database
+from app.database.database import Database
 from app.database.patient_md_repo import PatientMetadataRepo
 from app.database.patient_visits_repo import PatientVisitsRepo
 from app.database.exceptions import *
@@ -15,7 +15,7 @@ from .exceptions import *
 
 
 class PatientManager:
-    def __init__(self):
+    def __init__(self, database: Database):
         self._metadata_repo = None
         self._visits_repo = None
 
@@ -134,10 +134,11 @@ class PatientManager:
         visit = self._visit()
 
         try:
-             
+            self._visits_repo.insert(patient_id=patient_id,
+                                     visit=visit)
 
         except DatabaseCursorError, DatabaseExecutionError as exc:
-            raise PMDatabaseError from exc
+            raise PMDatabaseError() from exc
 
         except DatabaseDuplicateEntryError:
             raise PMDuplicateEntryError()
@@ -145,23 +146,94 @@ class PatientManager:
         else:
             self._visits_repo.commit()
 
-    def create_patient(self):
-        pass
+    def delete_patient(self, patient_id: int):
+        self._validate()
 
-    def delete_patient(self):
-        pass
+        try:
+            self._metadata_repo.delete(patient_id=patient_id)
 
-    def delete_visit(self):
-        pass
+        except DatabaseCursorError, DatabaseExecutionError as exc:
+            raise PMDatabaseError() from exc
 
-    def get_patient_metadata(self):
-        pass
+        except DatabaseAbsentEntryError:
+            raise PMAbsentEntryError()
 
-    def get_patient_visits(self):
-        pass
+        else:
+            self._metadata_repo.commit()
+            self._visits_repo.commit()
 
-    def get_patient(self):
-        pass
+    def delete_visit(self, visit_id: int):
+        self._validate()
+
+        try:
+            self._visits_repo.delete(visit_id=visit_id)
+
+        except DatabaseCursorError, DatabaseExecutionError as exc:
+            raise PMDatabaseError() from exc
+
+        except DatabaseAbsentEntryError:
+            raise PMAbsentEntryError()
+
+        else:
+            self._visits_repo.commit()
+
+    def delete_all_visits(self, patient_id: int):
+        self._validate()
+
+        try:
+            self._visits_repo.deleteall(patient_id=patient_id)
+
+        except DatabaseCursorError, DatabaseExecutionError as exc:
+            raise PMDatabaseError() from exc
+
+        except DatabaseAbsentEntryError:
+            raise PMAbsentEntryError()
+
+        else:
+            self._visits_repo.commit()
+
+    def get_patient_metadata(self, patient_id: int) -> PatientMetadata | None:
+        self._validate()
+
+        try:
+            data = self._metadata_repo.get(patient_id=patient_id)
+
+            return data
+
+        except DatabaseCursorError, DatabaseExecutionError as exc:
+            raise PMDatabaseError() from exc
+
+    def get_patient_visit(self, visit_id: int) -> Visit | None:
+        self._validate()
+
+        try:
+            data = self._visits_repo.get(visit_id=visit_id)
+
+            return data
+
+        except DatabaseCursorError, DatabaseExecutionError as exc:
+            raise PMDatabaseError() from exc
+
+    def get_all_patient_visits(self, patient_id: int) -> list[Visit]:
+        self._validate()
+
+        try:
+            data = self._visits_repo.getall(patient_id=patient_id)
+
+            return data
+
+        except DatabaseCursorError, DatabaseExecutionError as exc:
+            raise PMDatabaseError() from exc
+
+    def get_patient(self, patient_id: int) -> Patient | None:
+        self._validate()
+
+        metadata = self.get_patient_metadata(patient_id)
+        visits = self.get_all_patient_visits(patient_id)
+
+        return Patient(id=patient_id,
+                       metadata=metadata,
+                       visits=avisits)
 
     def edit_patient_metadata(self):
         pass
@@ -180,4 +252,6 @@ class PatientManager:
 
     def get_all_patients(self):
         pass
+
+patient_manager: PatientManager | None = None
 

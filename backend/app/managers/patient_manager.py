@@ -1,41 +1,38 @@
 """
-
 """
 
-from datetime import date as _date
-
-from app.models.patient import Patient
-from app.models.visit import Visit
-from app.models.medical_condition import MedicalCondition
-from app.database.database import database
-from app.database.patient_md_repo import PatientMetadataRepo
-from app.database.patient_visits_repo import PatientVisitsRepo
-from app.database.exceptions import *
-from .exceptions import *
+from app.database.database import Database
+from app.database.patient_repo import PatientRepository
 
 
 class PatientManager:
-    def __init__(self):
-        self._metadata_repo = None
-        self._visits_repo = None
+    def __init__(self, database: Database):
+        self.database = database
 
-        try:
-            self._metadata_repo = database.patient_md_repo
-            self._visits_repo = database.patient_visits_repo
+        self._repo = self.database.patient_repo
 
-        except Exception as exc:
-            raise PMDatabaseError() from exc
-
-        self._patient_id_count = 100001
-
-    def _validate(self) -> None:
-        if self._metadata_repo is None or self._visits_repo is None:
+        if self._repo is None:
             raise PMDatabaseError()
 
-    def _validate_metadata(self,
-                           name: str,
-                           dob: datetime,
-                           number: str) -> None:
+        self._last_id = self._get_last_id()
+
+    def _get_last_id(self):
+        try:
+            ids = self._repo.getids()
+
+            return max(ids) + 1
+
+        except (DatabaseCursorError, DatabasExecutionError) as exc:
+            raise PMDatabaseError() from exc
+
+    def _rollback_id(self):
+        self._last_id -= 1
+
+    def _validate(self):
+        if self._repo is None:
+            raise PMDatabaseError()
+
+    def _validate_inputs(self, name: str, dob: date | None, number: str):
         if not name or not number:
             raise PMInvalidInputsError()
 
@@ -45,139 +42,119 @@ class PatientManager:
         try:
             _ = int(number)
 
-        except ValueError:
+        except:
             raise PMInvalidInputsError()
 
-        # Maybe something for date as well
+    def _create_patient(
+            self,
+            name: str,
+            dob: date | None,
+            number: str,
+            condition: str,
+            is_active: bool) -> Patient:
+        self._validate_inputs(name, dob, number)
 
-    def _validate_visit(self, fees_paid: float, fees_pending: float) -> None:
-        if fees_paid < 0 or fees_pending < 0:
-            raise PMInvalidInputsError()
+        id = self._last_id
+        self._last_id += 1
 
-    def _create_metadata(self,
-                         name: str,
-                         dob: _date,
-                         number: str,
-                         condition: MedicalCondition,
-                         is_active: bool) -> PatientMetadata, int:
+        return Patient(
+                id = id,
+                name = name,
+                dob = dob,
+                number = number,
+                condition = condition,
+                is_active = is_active
+                )
 
-        self._validate_metadata(name, dob, number)
-
-        id = 0
-
-        return PatientMetadata(name=name,
-                               dob=dob,
-                               number=number,
-                               condition=condition,
-                               is_active=is_active), id
-
-    def _create_visit(self,
-                      id: int,
-                      date: _date,
-                      diagnosis: str,
-                      prescription: str,
-                      notes: str,
-                      fees_paid: float,
-                      fees_pending: float,
-                      follow_up_date: _date | None) -> Visit:
-        self._validate_visit(fees_paid, fees_pending)
-
-        id = 0
-
-        return Visit(id=id,
-                     date=date,
-                     diagnosis=diagnosis,
-                     prescription=prescription,
-                     notes=notes,
-                     fees_paid=fees_paid,
-                     fees_pending=fees_pending,
-                     follow_up_date=follow_up_date)
-
-    def create_patient_metadata(self,
-                       name: str,
-                       dob: _date,
-                       number: str,
-                       condition: MedicalCondition,
-                       is_active: bool = True,
-                       ) -> None:
-
+    def create(
+            self,
+            name: str,
+            dob: date | None,
+            number: str,
+            condition: str,
+            is_active: bool):
         self._validate()
 
-        self._validate_metadata(name, dob, number)
-
-        patient_metadata, id  = self._create_metadata(name, dob, number, condition, is_active)
-
         try:
-            self._metadata_repo.insert(patient_id=id,
-                                       patient_metadata=patient_metadata)
+            self._repo.insert(self._create_patient(
+                name,
+                dob,
+                number,
+                condition,
+                is_active
+                ))
 
-        except DatabaseCursorError, DatabaseExecutionError as exc:
-            raise PMDatabaseError from exc
+        except (DatabaseCursorError, DatabaseExecutionError) as exc:
+            self._rollback_id()
+            raise PMDatabaseError()
 
         except DatabaseDuplicateEntryError:
+            self._rollback_id()
             raise PMDuplicateEntryError()
 
         else:
-            self._metadata_repo.commit()
+            self._repo.commit()
 
-    def create_visit(self,
-                     patient_id: int,
-                     date: _date,
-                     diagnosis: str,
-                     prescription: str,
-                     notes: str,
-                     fees_paid: float,
-                     fees_pending: float,
-                     follow_up_date = _date | None):
+
+    def delete(self, patient_id: int):
         self._validate()
 
-        visit = self._visit()
-
         try:
-             
+            self._repo.delete(patient_id)
 
-        except DatabaseCursorError, DatabaseExecutionError as exc:
-            raise PMDatabaseError from exc
+        except (DatabaseCursorError, DatabaseExecutionError) as exc:
+            raise PMDatabaseError() from exc
 
-        except DatabaseDuplicateEntryError:
-            raise PMDuplicateEntryError()
+        except DatabaseAbsentEntryError:
+            raise PMAbsentEntryError()
 
         else:
-            self._visits_repo.commit()
+            self._repo.commit()
 
-    def create_patient(self):
-        pass
+    def clear(self):
+        self._validate()
+        
+        try:
+            self._repo.clear()
 
-    def delete_patient(self):
-        pass
+        except (DatabaseCursorError, DatabaseExecutionError) as exc:
+            raise PMDatabaseError() from exc
 
-    def delete_visit(self):
-        pass
+        else:
+            self._repo.commit()
 
-    def get_patient_metadata(self):
-        pass
+    def get(self, patient_id: int) -> Patient | None:
+        self._validate()
 
-    def get_patient_visits(self):
-        pass
+        try:
+            return self._repo.get(patient_id)
 
-    def get_patient(self):
-        pass
+        except (DatabaseCursorError, DatabaseExcutionError) as exc:
+            raise PMDatabaseError() from exc
 
-    def edit_patient_metadata(self):
-        pass
+    def getall(self):
+        self._validate()
 
-    def edit_patient_visit(self):
-        pass
+        try:
+            return self._repo.getall()
 
-    def edit_patient(self):
-        pass
+        except (DatabaseCursorError, DatabaseExecutionError) as exc:
+            raise PMDatabaseError() from exc
 
-    def get_all_patient_metadatas(self):
-        pass
+    def update(self, patient: Patient):
+        self._validate()
 
-    def get_all_patient_visits(self):
-        pass
+        try:
+            self._repo.update(patient)
 
-    def get_all_patients(self):
-        pass
+        except (DatabaseCursorError, DatabaseExecutionError) as exc:
+            raise PMDatabaseError() from exc
+
+        except DatabaseAbsentEntryError:
+            raise PMAbsentEntryError()
+
+        else:
+            self._repo.commit()
+
+patient_manager: PatientManager | None = None
 

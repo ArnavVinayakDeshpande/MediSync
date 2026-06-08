@@ -10,16 +10,11 @@ from .medical_condition import MedicalCondition
 
 
 @dataclass
-class PatientMetadata:
+class Patient:
+    id: int
     name: str
-    dob: _date 
+    dob: _date | None
     number: str
     condition: MedicalCondition
     is_active: bool
-
-@dataclass
-class Patient:
-    id: int
-    metadata: PatientMetadata
-    visits: list[Visit]
 

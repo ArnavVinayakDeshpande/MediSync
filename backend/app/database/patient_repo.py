@@ -89,6 +89,9 @@ class PatientRepository:
                         )
                     )
 
+        except sql3.IntegrityError:
+            raise DatabaseDuplicateEntryError()
+
         except sql3.Error as exc:
             raise DatabaseExecutionError(exc)
 
@@ -121,7 +124,7 @@ class PatientRepository:
         try:
             cursor.execute(
                     """
-                    DELETE * FROM patients
+                    DELETE FROM patients
                     """
                     )
 

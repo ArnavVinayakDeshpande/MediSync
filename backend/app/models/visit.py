@@ -8,7 +8,7 @@ from dataclasses import dataclass
 @dataclass
 class Visit:
     id: int
-    date: _date
+    date: _date | None
     diagnosis: str
     prescription: str
     notes: str

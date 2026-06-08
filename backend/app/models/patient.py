@@ -7,6 +7,7 @@ from datetime import date
 
 from .visit import Visit
 from .medical_condition import MedicalCondition
+from app.common.converter import date_to_json_fmt, date_from_json_fmt
 
 
 @dataclass

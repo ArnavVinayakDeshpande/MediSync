@@ -23,19 +23,19 @@ export default defineConfig({
       //
       // Update the target port/host when the backend team provides the URL.
       '/patients': {
-        target: 'http://localhost:8000',  // ← update when finalised
+        target: 'http://127.0.0.1:8000 ',  // ← update when finalised
         changeOrigin: true,
       },
 
       // ── Old FastAPI patient routes (kept until fully migrated) ───────────
       '/patient': {
-        target: 'http://localhost:8000',
+        target: 'http://127.0.0.1:8000 ',
         changeOrigin: true,
       },
 
       // ── FastAPI template routes ──────────────────────────────────────────
       '/templates': {
-        target: 'http://localhost:8000',
+        target: 'http://127.0.0.1:8000 ',
         changeOrigin: true,
       },
     }

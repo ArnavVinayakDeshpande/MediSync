@@ -5,6 +5,7 @@ from datetime import date
 
 from app.database.database import Database
 from app.database.patient_repo import PatientRepository
+from .exceptions import *
 
 
 class PatientManager:

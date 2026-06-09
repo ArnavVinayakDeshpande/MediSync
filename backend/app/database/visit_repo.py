@@ -148,9 +148,6 @@ class VisitRepository:
                     (patient_id,)
                     )
 
-            if cursor.rowcount == 0:
-                raise DatabaseAbsentEntryError()
-
         except sql3.Error as exc:
             raise DatabaseExecutionError(exc)
 

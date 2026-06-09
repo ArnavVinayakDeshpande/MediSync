@@ -1,23 +1,12 @@
 // @refresh reset
 // src/context/DataContext.jsx
 //
-// Patients now come from the FastAPI backend (/patient/*)
-// Templates still come from the Node.js/Express backend (/api/*)
+// Patient fields: id · name · dob · number · condition · is_active
+// All other fields (age, last_visit, follow_up_date, fees, notes) removed.
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 
 const DataContext = createContext(null);
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-// Auto-generate next 6-digit patient ID from existing list
-function nextPatientId(patients) {
-  const nums = patients
-    .map((p) => parseInt(p.id, 10))
-    .filter((n) => !isNaN(n) && n >= 100000 && n <= 999999);
-  const next = nums.length > 0 ? Math.max(...nums) + 1 : 100001;
-  return String(Math.min(next, 999999));
-}
 
 export function DataProvider({ children }) {
   const [patients,  setPatients]  = useState(null);
@@ -28,13 +17,12 @@ export function DataProvider({ children }) {
   const templatesRef = useRef(null);
   useEffect(() => { templatesRef.current = templates; }, [templates]);
 
-  // ── Load patients from FastAPI ──────────────────────────────────────────────
+  // ── Load patients ───────────────────────────────────────────────────────────
   const refreshPatients = useCallback(async () => {
     try {
       const res = await fetch("/patient/view/md");
       if (!res.ok) throw new Error(`GET /patient/view/md → ${res.status}`);
-      const data = await res.json(); // array of PatientMetaData JSON
-      setPatients(data);
+      setPatients(await res.json());
       setError(null);
     } catch (err) {
       console.error("Failed to load patients:", err);
@@ -43,10 +31,10 @@ export function DataProvider({ children }) {
     }
   }, []);
 
-  // ── Load templates from Express ─────────────────────────────────────────────
+  // ── Load templates (from Express) ───────────────────────────────────────────
   const refreshTemplates = useCallback(async () => {
     try {
-      const res  = await fetch("/api/data");
+      const res = await fetch("/api/data");
       if (!res.ok) throw new Error(`GET /api/data → ${res.status}`);
       const data = await res.json();
       setTemplates(data.templates || []);
@@ -61,64 +49,80 @@ export function DataProvider({ children }) {
       .finally(() => setLoading(false));
   }, [refreshPatients, refreshTemplates]);
 
-  // ── Add patient (POST /patient/add/det with full Patient JSON) ──────────────
-  const addPatient = useCallback(async (formData) => {
-    // Build Patient JSON from form fields using exact variable names
-    const id = formData.id || nextPatientId(patients || []);
+  // ── Generate Patient ID (GET /patient/id) ───────────────────────────────────
+  // Called by the Add Patient button before opening the form.
+  // Returns the generated ID string, or throws on failure.
+  const generatePatientId = useCallback(async () => {
+    const res = await fetch("/patient/id");
+    if (!res.ok) throw new Error(`GET /patient/id → ${res.status}`);
+    const data = await res.json();
+    // FastAPI returns { patient_id: "100123" }
+    return String(data.patient_id);
+  }, []);
 
-    const patientJson = {
-      metadata: {
-        id:         id,
-        name:       formData.name,
-        age:        parseInt(formData.age, 10) || 0,
-        number:     formData.number,
-        is_active:  formData.is_active,
-        last_visit: formData.last_visit || "",
-      },
-      visits:          [],
-      follow_up_date:  formData.follow_up_date  || null,
-      total_fees_paid: parseFloat(formData.total_fees_paid) || 0,
-      fees_unpaid:     parseFloat(formData.fees_unpaid)     || 0,
-      notes:           formData.notes || "",
-    };
-
-    const res = await fetch("/patient/add/det", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(patientJson),
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.detail || "Failed to add patient");
-    }
-    await refreshPatients();
-  }, [patients, refreshPatients]);
-
-  // ── Update patient (PATCH /patient/edit/det/{id}) ───────────────────────────
-  const updatePatient = useCallback(async (formData) => {
-    const patientJson = {
+  // ── Build Patient JSON (POST / PATCH body) ──────────────────────────────────
+  // Maps the flat form object the page sends into the Patient schema
+  // the FastAPI backend expects.
+  //
+  // Patient schema (FastAPI):
+  //   metadata: { id, name, dob, number, condition, is_active }
+  //
+  // NOTE: visits, follow_up_date, total_fees_paid, fees_unpaid, notes are
+  // kept as empty/zero so the backend doesn't reject the request. Remove
+  // them here once the backend schema is updated to not require them.
+  function buildPatientJson(formData, existingVisits = []) {
+    return {
       metadata: {
         id:         formData.id,
         name:       formData.name,
-        age:        parseInt(formData.age, 10) || 0,
+        dob:        formData.dob         || "",
         number:     formData.number,
+        condition:  formData.condition   || "",
         is_active:  formData.is_active,
-        last_visit: formData.last_visit || "",
       },
-      visits:          formData.visits          || [],
-      follow_up_date:  formData.follow_up_date  || null,
-      total_fees_paid: parseFloat(formData.total_fees_paid) || 0,
-      fees_unpaid:     parseFloat(formData.fees_unpaid)     || 0,
-      notes:           formData.notes || "",
+      visits:          existingVisits,
+      follow_up_date:  null,
+      total_fees_paid: 0,
+      fees_unpaid:     0,
+      notes:           "",
     };
+  }
 
+  // ── Add patient (POST /patient/add/det) ─────────────────────────────────────
+  const addPatient = useCallback(async (formData) => {
+    const body = buildPatientJson({
+      ...formData,
+      is_active: formData.is_active === "true" || formData.is_active === true,
+    });
+    const res = await fetch("/patient/add/det", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to add patient");
+    }
+    await refreshPatients();
+  }, [refreshPatients]);
+
+  // ── Update patient (PATCH /patient/edit/det/{id}) ───────────────────────────
+  const updatePatient = useCallback(async (formData) => {
+    // Preserve existing visits if available on the formData
+    const body = buildPatientJson(
+      {
+        ...formData,
+        is_active: formData.is_active === "true" || formData.is_active === true,
+      },
+      formData.visits || []
+    );
     const res = await fetch(`/patient/edit/det/${formData.id}`, {
       method:  "PATCH",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(patientJson),
+      body:    JSON.stringify(body),
     });
     if (!res.ok) {
-      const err = await res.json();
+      const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || "Failed to update patient");
     }
     await refreshPatients();
@@ -128,20 +132,20 @@ export function DataProvider({ children }) {
   const deletePatient = useCallback(async (id) => {
     const res = await fetch(`/patient/remove/${id}`, { method: "DELETE" });
     if (!res.ok) {
-      const err = await res.json();
+      const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || "Failed to delete patient");
     }
     await refreshPatients();
   }, [refreshPatients]);
 
-  // ── View full patient details (GET /patient/view/det/{id}) ──────────────────
+  // ── Fetch full patient details (GET /patient/view/det/{id}) ────────────────
   const fetchPatientDetails = useCallback(async (id) => {
     const res = await fetch(`/patient/view/det/${id}`);
     if (!res.ok) throw new Error(`Patient ${id} not found`);
-    return res.json(); // full Patient JSON
+    return res.json();
   }, []);
 
-  // ── Template mutations (still on Express) ───────────────────────────────────
+  // ── Update template (Express) ───────────────────────────────────────────────
   const updateTemplate = useCallback(async (week, message) => {
     const next = (templatesRef.current || []).map((t) =>
       t.week === week ? { ...t, message } : t
@@ -164,6 +168,7 @@ export function DataProvider({ children }) {
       error,
       isLoaded,
       refreshPatients,
+      generatePatientId,
       addPatient,
       updatePatient,
       deletePatient,

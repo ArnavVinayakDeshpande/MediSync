@@ -10,16 +10,30 @@ export default defineConfig({
   ],
   server: {
     proxy: {
-      // Node.js / Express — appointments, old excel stuff
+      // ── Node.js / Express (appointments, templates) ─────────────────────
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
-      // Python / FastAPI — patients and message templates
+
+      // ── New patient REST API ─────────────────────────────────────────────
+      // IMPORTANT: '/patients' must be listed BEFORE '/patient' below.
+      // Vite uses prefix matching — without this order, '/patient' would
+      // accidentally intercept '/patients/...' calls.
+      //
+      // Update the target port/host when the backend team provides the URL.
+      '/patients': {
+        target: 'http://localhost:8000',  // ← update when finalised
+        changeOrigin: true,
+      },
+
+      // ── Old FastAPI patient routes (kept until fully migrated) ───────────
       '/patient': {
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+
+      // ── FastAPI template routes ──────────────────────────────────────────
       '/templates': {
         target: 'http://localhost:8000',
         changeOrigin: true,

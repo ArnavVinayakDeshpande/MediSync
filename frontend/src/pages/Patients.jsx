@@ -1,46 +1,62 @@
 // src/pages/Patients.jsx
-// Patient data now comes from FastAPI backend.
-// Field names match the Python models exactly:
-//   PatientMetaData: id, name, age, number, is_active, last_visit
-//   Patient (details): metadata, visits, follow_up_date, total_fees_paid, fees_unpaid, notes
+//
+// Patient fields: Patient ID · Name · Date of Birth · Contact Number · Condition · Active
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
   Search, UserPlus, Eye, Pencil, Trash2, X, AlertCircle,
   ArrowUpDown, Filter, ChevronDown, ArrowUp, ArrowDown, Loader2,
 } from "lucide-react";
 import { useData } from "../context/DataContext";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function generatePatientId(patients) {
-  const nums = patients
-    .map((p) => parseInt(p.id, 10))
-    .filter((n) => !isNaN(n) && n >= 100000 && n <= 999999);
-  const next = nums.length > 0 ? Math.max(...nums) + 1 : 100001;
-  return String(Math.min(next, 999999));
-}
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-// DD-MM-YY or DD-MM-YYYY → display as-is (already formatted by backend)
-function fmtDate(str) {
+const CONDITIONS = [
+  "Pregnancy",
+  "Condition 2", "Condition 3", "Condition 4",  "Condition 5",
+  "Condition 6", "Condition 7", "Condition 8",  "Condition 9", "Condition 10",
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// YYYY-MM-DD → DD/MM/YYYY
+function fmtDOB(str) {
   if (!str || str === "") return "—";
-  return str;
+  const [y, m, d] = str.split("-");
+  if (!y || !m || !d) return str;
+  return `${d}/${m}/${y}`;
 }
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
+
 function ActiveBadge({ active }) {
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold
       ${active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
-      {active ? "Yes" : "No"}
+      {active ? "Active" : "Inactive"}
     </span>
   );
 }
 
-function Field({ label, required, error, children }) {
+function ConditionBadge({ condition }) {
+  const isPregnancy = condition === "Pregnancy";
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold
+      ${isPregnancy ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"}`}>
+      {condition || "—"}
+    </span>
+  );
+}
+
+// ─── Field wrapper ─────────────────────────────────────────────────────────────
+
+function Field({ label, required, error, hint, children }) {
   return (
     <div>
       <label className="block text-xs font-semibold text-slate-600 mb-1">
-        {label}{required && <span className="text-rose-500 ml-0.5">*</span>}
+        {label}
+        {required && <span className="text-rose-500 ml-0.5">*</span>}
+        {hint   && <span className="ml-1 text-slate-400 font-normal">{hint}</span>}
       </label>
       {children}
       {error && (
@@ -52,40 +68,39 @@ function Field({ label, required, error, children }) {
   );
 }
 
-// ─── Patient Form (Add / Edit) ────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+//  Patient Form  (Add & Edit)
+// ─────────────────────────────────────────────────────────────────────────────
+
 const EMPTY_FORM = {
-  id: "", name: "", age: "", number: "", is_active: "",
-  last_visit: "", follow_up_date: "", total_fees_paid: "",
-  fees_unpaid: "", notes: "",
+  id: "", name: "", dob: "", number: "", condition: "", is_active: "",
 };
 
-function PatientForm({ title, initial, isEdit, patients, onSave, onClose }) {
-  const [form,   setForm]   = useState({ ...initial });
-  const [errors, setErrors] = useState({});
-  const [saving, setSaving] = useState(false);
+function PatientForm({ title, initial, isEdit, idIsGenerated, patients, onSave, onClose }) {
+  const [form,        setForm]        = useState({ ...initial });
+  const [errors,      setErrors]      = useState({});
+  const [saving,      setSaving]      = useState(false);
   const [serverError, setServerError] = useState(null);
 
   const set = (key, val) => {
-    setForm((p) => ({ ...p, [key]: val }));
-    setErrors((p) => ({ ...p, [key]: "" }));
+    setForm((p)   => ({ ...p,   [key]: val }));
+    setErrors((p) => ({ ...p,   [key]: ""  }));
   };
 
   const validate = () => {
     const e = {};
-    if (!isEdit && form.id.trim() !== "") {
-      if (!/^\d{6}$/.test(form.id.trim())) e.id = "Must be exactly 6 digits.";
-      else if (patients.some((p) => p.id === form.id.trim())) e.id = "ID already exists.";
+    // ID: only validate when the user types one manually (not auto-generated, not editing)
+    if (!isEdit && !idIsGenerated && form.id.trim() !== "") {
+      if (!/^\d{6}$/.test(form.id.trim()))
+        e.id = "Must be exactly 6 digits.";
+      else if ((patients || []).some((p) => p.id === form.id.trim()))
+        e.id = "This ID already exists.";
     }
-    if (!form.name.trim())   e.name   = "Name is required.";
-    if (!form.number.trim()) e.number = "Contact number is required.";
-    else if (!/^\d{10}$/.test(form.number.trim())) e.number = "Must be 10 digits.";
-    if (form.age !== "" && (isNaN(Number(form.age)) || Number(form.age) <= 0 || Number(form.age) > 120))
-      e.age = "Enter a valid age (1–120).";
+    if (!form.name.trim())    e.name      = "Name is required.";
+    if (!form.number.trim())  e.number    = "Contact number is required.";
+    else if (!/^\d{10}$/.test(form.number.trim()))
+                              e.number    = "Must be exactly 10 digits.";
     if (form.is_active === "") e.is_active = "Please select a status.";
-    if (form.total_fees_paid !== "" && isNaN(Number(form.total_fees_paid)))
-      e.total_fees_paid = "Must be a number.";
-    if (form.fees_unpaid !== "" && isNaN(Number(form.fees_unpaid)))
-      e.fees_unpaid = "Must be a number.";
     return e;
   };
 
@@ -95,10 +110,10 @@ function PatientForm({ title, initial, isEdit, patients, onSave, onClose }) {
     setSaving(true);
     setServerError(null);
     try {
-      const finalId = isEdit
-        ? initial.id
-        : (form.id.trim() !== "" ? form.id.trim() : generatePatientId(patients));
-      await onSave({ ...form, id: finalId, is_active: form.is_active === "true" });
+      await onSave({
+        ...form,
+        is_active: form.is_active === "true" || form.is_active === true,
+      });
     } catch (err) {
       setServerError(err.message);
     } finally {
@@ -106,9 +121,13 @@ function PatientForm({ title, initial, isEdit, patients, onSave, onClose }) {
     }
   };
 
+  const idLocked = isEdit || idIsGenerated;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md my-auto">
+
+        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <h2 className="text-base font-bold text-slate-800">{title}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition">
@@ -116,30 +135,49 @@ function PatientForm({ title, initial, isEdit, patients, onSave, onClose }) {
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+        <div className="px-6 py-5 space-y-4">
 
           {serverError && (
-            <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-xs text-rose-700 font-medium">
+            <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-xs
+                            text-rose-700 font-medium">
               {serverError}
             </div>
           )}
 
           {/* Patient ID */}
-          <Field label="Patient ID" error={errors.id}>
-            <input type="text" inputMode="numeric" maxLength={6}
-              value={form.id}
-              onChange={(e) => set("id", e.target.value.replace(/\D/g, "").slice(0, 6))}
-              placeholder={isEdit ? "" : "6-digit number (auto if blank)"}
-              disabled={isEdit}
-              className={`w-full px-3 py-2 text-sm border rounded-xl transition
-                focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent
-                ${isEdit ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                  : errors.id ? "border-rose-300 bg-rose-50 text-slate-700"
-                  : "border-slate-200 bg-white text-slate-700"}`}
-            />
+          <Field
+            label="Patient ID"
+            error={errors.id}
+            hint={idIsGenerated
+              ? "(auto-generated by server)"
+              : !isEdit ? "(auto-generated if left blank)" : undefined}
+          >
+            <div className="relative">
+              <input
+                type="text" inputMode="numeric" maxLength={6}
+                value={form.id}
+                onChange={(e) => set("id", e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder={idLocked ? "" : "6-digit number"}
+                disabled={idLocked}
+                className={`w-full px-3 py-2 text-sm border rounded-xl transition
+                  focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent
+                  ${idLocked
+                    ? "bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed font-mono"
+                    : errors.id
+                      ? "border-rose-300 bg-rose-50 text-slate-700"
+                      : "border-slate-200 bg-white text-slate-700"}`}
+              />
+              {idIsGenerated && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2
+                                 text-[10px] font-bold bg-teal-100 text-teal-700
+                                 px-2 py-0.5 rounded-full">
+                  Generated
+                </span>
+              )}
+            </div>
           </Field>
 
-          {/* Name + Number */}
+          {/* Name + Contact */}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Name" required error={errors.name}>
               <input type="text" value={form.name}
@@ -147,7 +185,9 @@ function PatientForm({ title, initial, isEdit, patients, onSave, onClose }) {
                 placeholder="Full name"
                 className={`w-full px-3 py-2 text-sm border rounded-xl transition
                   focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent
-                  ${errors.name ? "border-rose-300 bg-rose-50" : "border-slate-200 bg-white text-slate-700"}`}
+                  ${errors.name
+                    ? "border-rose-300 bg-rose-50"
+                    : "border-slate-200 bg-white text-slate-700"}`}
               />
             </Field>
             <Field label="Contact Number" required error={errors.number}>
@@ -156,20 +196,22 @@ function PatientForm({ title, initial, isEdit, patients, onSave, onClose }) {
                 placeholder="10-digit number" inputMode="numeric"
                 className={`w-full px-3 py-2 text-sm border rounded-xl transition
                   focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent
-                  ${errors.number ? "border-rose-300 bg-rose-50" : "border-slate-200 bg-white text-slate-700"}`}
+                  ${errors.number
+                    ? "border-rose-300 bg-rose-50"
+                    : "border-slate-200 bg-white text-slate-700"}`}
               />
             </Field>
           </div>
 
-          {/* Age + Active */}
+          {/* Date of Birth + Active Status */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Age" error={errors.age}>
-              <input type="text" value={form.age}
-                onChange={(e) => set("age", e.target.value.replace(/\D/g, "").slice(0, 3))}
-                placeholder="Years" inputMode="numeric"
-                className={`w-full px-3 py-2 text-sm border rounded-xl transition
-                  focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent
-                  ${errors.age ? "border-rose-300 bg-rose-50" : "border-slate-200 bg-white text-slate-700"}`}
+            <Field label="Date of Birth" hint="(optional)">
+              <input type="date" value={form.dob}
+                onChange={(e) => set("dob", e.target.value)}
+                max={new Date().toISOString().split("T")[0]}
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white
+                           text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400
+                           focus:border-transparent transition"
               />
             </Field>
             <Field label="Active Status" required error={errors.is_active}>
@@ -185,62 +227,22 @@ function PatientForm({ title, initial, isEdit, patients, onSave, onClose }) {
             </Field>
           </div>
 
-          {/* Last Visit + Follow-up Date */}
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Last Visit (DD-MM-YY)">
-              <input type="text" value={form.last_visit}
-                onChange={(e) => set("last_visit", e.target.value)}
-                placeholder="e.g. 15-06-25"
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white
-                           text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400
-                           focus:border-transparent transition"
-              />
-            </Field>
-            <Field label="Follow-up Date (DD-MM-YYYY)">
-              <input type="text" value={form.follow_up_date}
-                onChange={(e) => set("follow_up_date", e.target.value)}
-                placeholder="e.g. 15-06-2025"
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white
-                           text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400
-                           focus:border-transparent transition"
-              />
-            </Field>
-          </div>
-
-          {/* Fees */}
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Total Fees Paid (₹)" error={errors.total_fees_paid}>
-              <input type="text" value={form.total_fees_paid}
-                onChange={(e) => set("total_fees_paid", e.target.value)}
-                placeholder="0.00" inputMode="decimal"
-                className={`w-full px-3 py-2 text-sm border rounded-xl transition
-                  focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent
-                  ${errors.total_fees_paid ? "border-rose-300 bg-rose-50" : "border-slate-200 bg-white text-slate-700"}`}
-              />
-            </Field>
-            <Field label="Fees Unpaid (₹)" error={errors.fees_unpaid}>
-              <input type="text" value={form.fees_unpaid}
-                onChange={(e) => set("fees_unpaid", e.target.value)}
-                placeholder="0.00" inputMode="decimal"
-                className={`w-full px-3 py-2 text-sm border rounded-xl transition
-                  focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent
-                  ${errors.fees_unpaid ? "border-rose-300 bg-rose-50" : "border-slate-200 bg-white text-slate-700"}`}
-              />
-            </Field>
-          </div>
-
-          {/* Notes */}
-          <Field label="Notes">
-            <textarea value={form.notes}
-              onChange={(e) => set("notes", e.target.value)}
-              rows={3} placeholder="Clinical notes, remarks…"
+          {/* Condition */}
+          <Field label="Condition" hint="(optional)">
+            <select value={form.condition}
+              onChange={(e) => set("condition", e.target.value)}
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white
-                         text-slate-700 resize-y focus:outline-none focus:ring-2
-                         focus:ring-indigo-400 focus:border-transparent transition"
-            />
+                         text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400
+                         focus:border-transparent transition">
+              <option value="">Select condition…</option>
+              {CONDITIONS.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
           </Field>
         </div>
 
+        {/* Footer */}
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
           <button onClick={onClose} disabled={saving}
             className="px-4 py-2 text-sm font-semibold text-slate-600 border border-slate-200
@@ -259,62 +261,78 @@ function PatientForm({ title, initial, isEdit, patients, onSave, onClose }) {
   );
 }
 
-// ─── View Details Modal ───────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+//  View Details Modal
+// ─────────────────────────────────────────────────────────────────────────────
+
 function DetailRow({ label, value }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-start gap-1 py-2.5 border-b border-slate-100 last:border-0">
-      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide sm:w-44 flex-shrink-0">{label}</span>
-      <span className="text-sm text-slate-800">{value || "—"}</span>
+    <div className="flex flex-col sm:flex-row sm:items-start gap-1 py-2.5
+                    border-b border-slate-100 last:border-0">
+      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide
+                       sm:w-40 flex-shrink-0 pt-0.5">
+        {label}
+      </span>
+      <span className="text-sm text-slate-800">
+        {value ?? <span className="text-slate-300 italic">—</span>}
+      </span>
     </div>
   );
 }
 
 function ViewDetailsModal({ patientId, onClose, onEdit, onDelete, fetchPatientDetails }) {
   const [details,       setDetails]       = useState(null);
-  const [loading,       setLoading]       = useState(true);
+  const [loadingDet,    setLoadingDet]    = useState(true);
+  const [fetchError,    setFetchError]    = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting,      setDeleting]      = useState(false);
 
-  // Fetch full details on mount
-  useState(() => {
+  // Fetch on mount — useRef prevents double-fetch in React StrictMode
+  const fetched = useRef(false);
+  useEffect(() => {
+    if (fetched.current) return;
+    fetched.current = true;
     fetchPatientDetails(patientId)
       .then(setDetails)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  });
-
-  // useEffect to load on mount
-  const [loaded, setLoaded] = useState(false);
-  if (!loaded) {
-    fetchPatientDetails(patientId)
-      .then((d) => { setDetails(d); setLoading(false); setLoaded(true); })
-      .catch(() => setLoading(false));
-  }
+      .catch((err) => setFetchError(err.message))
+      .finally(() => setLoadingDet(false));
+  }, [patientId, fetchPatientDetails]);
 
   const handleDelete = async () => {
     setDeleting(true);
-    await onDelete(patientId);
+    try {
+      await onDelete(patientId);
+    } catch (err) {
+      setDeleting(false);
+      setConfirmDelete(false);
+      alert(`Delete failed: ${err.message}`);
+    }
   };
 
   const md = details?.metadata;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md my-auto">
 
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        {/* Header */}
+        <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100">
           <div>
             <h2 className="text-base font-bold text-slate-800">{md?.name ?? "Loading…"}</h2>
             <p className="text-xs text-slate-400 font-mono mt-0.5">ID: {patientId}</p>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-2 flex-shrink-0 ml-4">
             {details && (
               <>
+                {/* Edit button */}
                 <button onClick={() => onEdit(details)}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold
                              bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition">
                   <Pencil size={12} /> Edit
                 </button>
+
+                {/* Delete button / inline confirm */}
                 {!confirmDelete ? (
                   <button onClick={() => setConfirmDelete(true)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold
@@ -322,12 +340,13 @@ function ViewDetailsModal({ patientId, onClose, onEdit, onDelete, fetchPatientDe
                     <Trash2 size={12} /> Delete
                   </button>
                 ) : (
-                  <div className="flex items-center gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-1.5">
+                  <div className="flex items-center gap-2 bg-rose-50 border border-rose-200
+                                  rounded-xl px-3 py-1.5">
                     <span className="text-xs text-rose-700 font-semibold">Confirm?</span>
                     <button onClick={handleDelete} disabled={deleting}
                       className="text-xs font-bold text-white bg-rose-600 hover:bg-rose-700
                                  px-2 py-1 rounded-lg transition disabled:opacity-50">
-                      {deleting ? "…" : "Yes"}
+                      {deleting ? <Loader2 size={11} className="animate-spin" /> : "Yes"}
                     </button>
                     <button onClick={() => setConfirmDelete(false)}
                       className="text-xs font-semibold text-slate-600 hover:text-slate-800 transition">
@@ -337,37 +356,48 @@ function ViewDetailsModal({ patientId, onClose, onEdit, onDelete, fetchPatientDe
                 )}
               </>
             )}
-            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition ml-1">
+            <button onClick={onClose}
+              className="text-slate-400 hover:text-slate-600 transition ml-1">
               <X size={18} />
             </button>
           </div>
         </div>
 
-        <div className="px-6 py-4 max-h-[65vh] overflow-y-auto">
-          {loading ? (
-            <div className="flex items-center gap-2 text-slate-400 py-8 justify-center">
+        {/* Body */}
+        <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
+          {loadingDet ? (
+            <div className="flex items-center gap-2 text-slate-400 py-10 justify-center">
               <Loader2 size={16} className="animate-spin" /> Loading details…
+            </div>
+          ) : fetchError ? (
+            <div className="bg-rose-50 border border-rose-100 rounded-xl px-4 py-3
+                            text-sm text-rose-600">
+              {fetchError}
             </div>
           ) : details ? (
             <>
-              <DetailRow label="Patient ID"     value={md.id} />
-              <DetailRow label="Name"           value={md.name} />
-              <DetailRow label="Contact"        value={md.number} />
-              <DetailRow label="Age"            value={md.age ? `${md.age} years` : "—"} />
-              <DetailRow label="Status"         value={md.is_active ? "Active" : "Inactive"} />
-              <DetailRow label="Last Visit"     value={fmtDate(md.last_visit)} />
-              <DetailRow label="Follow-up Date" value={fmtDate(details.follow_up_date)} />
-              <DetailRow label="Fees Paid"      value={details.total_fees_paid ? `₹${details.total_fees_paid.toFixed(2)}` : "—"} />
-              <DetailRow label="Fees Unpaid"    value={details.fees_unpaid     ? `₹${details.fees_unpaid.toFixed(2)}`     : "—"} />
-              <div className="py-2.5">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Notes</span>
-                <p className="text-sm text-slate-800 mt-1 leading-relaxed whitespace-pre-wrap">
-                  {details.notes || "—"}
-                </p>
-              </div>
+              <DetailRow label="Patient ID"      value={md?.id} />
+              <DetailRow label="Name"            value={md?.name} />
+              <DetailRow label="Date of Birth"   value={fmtDOB(md?.dob)} />
+              <DetailRow label="Contact Number"  value={md?.number} />
+              <DetailRow label="Condition"       value={md?.condition || "—"} />
+              <DetailRow
+                label="Active Status"
+                value={
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full
+                                    text-xs font-semibold
+                    ${md?.is_active
+                      ? "bg-green-100 text-green-700"
+                      : "bg-red-100 text-red-600"}`}>
+                    {md?.is_active ? "Active" : "Inactive"}
+                  </span>
+                }
+              />
             </>
           ) : (
-            <p className="text-sm text-slate-400 py-8 text-center">Could not load patient details.</p>
+            <p className="text-sm text-slate-400 py-8 text-center">
+              Could not load patient details.
+            </p>
           )}
         </div>
 
@@ -383,7 +413,8 @@ function ViewDetailsModal({ patientId, onClose, onEdit, onDelete, fetchPatientDe
   );
 }
 
-// ─── Sort button ──────────────────────────────────────────────────────────────
+// ─── Sort Button ──────────────────────────────────────────────────────────────
+
 function SortButton({ sortKey, sortDir, currentKey, label, onClick }) {
   const active = currentKey === sortKey;
   return (
@@ -394,37 +425,140 @@ function SortButton({ sortKey, sortDir, currentKey, label, onClick }) {
           ? "bg-indigo-600 text-white border-indigo-600"
           : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-600"}`}>
       {active
-        ? sortDir === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+        ? (sortDir === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />)
         : <ArrowUpDown size={12} className="text-slate-400" />}
       {label}
     </button>
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
-export default function Patients() {
-  const { patients, addPatient, updatePatient, deletePatient, fetchPatientDetails, loading, error } = useData();
+// ─────────────────────────────────────────────────────────────────────────────
+//  Filter Dropdown
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const [query,        setQuery]        = useState("");
-  const [sortKey,      setSortKey]      = useState("last_visit");
-  const [sortDir,      setSortDir]      = useState("desc");
-  const [filterOpen,   setFilterOpen]   = useState(false);
-  const [filterActive, setFilterActive] = useState("all");
-  const [ageMin,       setAgeMin]       = useState("");
-  const [ageMax,       setAgeMax]       = useState("");
-  const [modal,        setModal]        = useState(null);
+function FilterDropdown({ filterActive, setFilterActive, filterConditions, setFilterConditions }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const toggleCondition = (c) =>
+    setFilterConditions((prev) =>
+      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]
+    );
+
+  const activeCount =
+    (filterActive !== "all" ? 1 : 0) +
+    (filterConditions.length > 0 ? 1 : 0);
+
+  const clearAll = () => { setFilterActive("all"); setFilterConditions([]); };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen((o) => !o)}
+        className={`flex items-center gap-2 px-3 py-2.5 text-sm font-semibold
+          border rounded-xl transition whitespace-nowrap
+          ${activeCount > 0
+            ? "bg-indigo-600 text-white border-indigo-600"
+            : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"}`}>
+        <Filter size={14} />
+        Filter
+        {activeCount > 0 && (
+          <span className="bg-white/30 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+            {activeCount}
+          </span>
+        )}
+        <ChevronDown size={13} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-slate-200
+                        rounded-xl shadow-lg p-4 w-60 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-700">Filters</span>
+            {activeCount > 0 && (
+              <button onClick={clearAll}
+                className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold">
+                Clear all
+              </button>
+            )}
+          </div>
+
+          {/* Status */}
+          <div>
+            <p className="text-xs font-semibold text-slate-500 mb-1.5">Status</p>
+            <div className="flex gap-2">
+              {[["all", "All"], ["active", "Active"], ["inactive", "Inactive"]].map(([val, lbl]) => (
+                <button key={val} onClick={() => setFilterActive(val)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition
+                    ${filterActive === val
+                      ? "bg-indigo-600 text-white border-indigo-600"
+                      : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"}`}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Condition */}
+          <div>
+            <p className="text-xs font-semibold text-slate-500 mb-1.5">Condition</p>
+            <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+              {CONDITIONS.map((c) => {
+                const checked = filterConditions.includes(c);
+                return (
+                  <label key={c}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50
+                               cursor-pointer text-xs text-slate-700">
+                    <input type="checkbox" checked={checked}
+                      onChange={() => toggleCondition(c)}
+                      className="accent-indigo-600" />
+                    {c}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Page
+// ─────────────────────────────────────────────────────────────────────────────
+
+export default function Patients() {
+  const {
+    patients, loading, error,
+    generatePatientId,
+    addPatient, updatePatient, deletePatient, fetchPatientDetails,
+  } = useData();
+
+  const [query,            setQuery]            = useState("");
+  const [sortKey,          setSortKey]          = useState("name");
+  const [sortDir,          setSortDir]          = useState("asc");
+  const [filterActive,     setFilterActive]     = useState("all");
+  const [filterConditions, setFilterConditions] = useState([]);
+  const [modal,            setModal]            = useState(null);
+  const [idFetching,       setIdFetching]       = useState(false);
+  const [idFetchError,     setIdFetchError]     = useState(null);
 
   const handleSort = (key) => {
-    if (sortKey === key) setSortDir((d) => d === "asc" ? "desc" : "asc");
-    else { setSortKey(key); setSortDir("desc"); }
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
   };
 
   const activeFilterCount =
     (filterActive !== "all" ? 1 : 0) +
-    (ageMin !== "" || ageMax !== "" ? 1 : 0);
+    (filterConditions.length > 0 ? 1 : 0);
 
-  const clearFilters = () => { setFilterActive("all"); setAgeMin(""); setAgeMax(""); };
-
+  // ── Filtered + sorted list ──────────────────────────────────────────────────
   const displayed = useMemo(() => {
     let list = [...(patients || [])];
 
@@ -433,75 +567,66 @@ export default function Patients() {
       list = list.filter((p) =>
         p.name.toLowerCase().includes(q) ||
         p.id.includes(q) ||
-        p.number.includes(q)
+        (p.number || "").includes(q)
       );
     }
 
     if (filterActive === "active")   list = list.filter((p) =>  p.is_active);
     if (filterActive === "inactive") list = list.filter((p) => !p.is_active);
 
-    if (ageMin !== "") list = list.filter((p) => Number(p.age) >= Number(ageMin));
-    if (ageMax !== "") list = list.filter((p) => Number(p.age) <= Number(ageMax));
+    if (filterConditions.length > 0)
+      list = list.filter((p) => filterConditions.includes(p.condition));
 
     list.sort((a, b) => {
       let av, bv;
-      if (sortKey === "name")       { av = a.name.toLowerCase();    bv = b.name.toLowerCase(); }
-      if (sortKey === "id")         { av = parseInt(a.id, 10) || 0; bv = parseInt(b.id, 10) || 0; }
-      if (sortKey === "age")        { av = a.age || 0;              bv = b.age || 0; }
-      if (sortKey === "last_visit") {
-        // DD-MM-YY → sort as string YYMMDD for correct date order
-        const toSortable = (s) => {
-          if (!s) return "000000";
-          const [d, m, y] = s.split("-");
-          return `${y || "00"}${m || "00"}${d || "00"}`;
-        };
-        av = toSortable(a.last_visit);
-        bv = toSortable(b.last_visit);
-      }
+      if (sortKey === "name") { av = a.name.toLowerCase();    bv = b.name.toLowerCase(); }
+      if (sortKey === "id")   { av = parseInt(a.id, 10) || 0; bv = parseInt(b.id, 10) || 0; }
+      if (sortKey === "dob")  { av = a.dob  || "0000";        bv = b.dob  || "0000"; }
       if (av < bv) return sortDir === "asc" ? -1 :  1;
       if (av > bv) return sortDir === "asc" ?  1 : -1;
       return 0;
     });
 
     return list;
-  }, [patients, query, filterActive, ageMin, ageMax, sortKey, sortDir]);
+  }, [patients, query, filterActive, filterConditions, sortKey, sortDir]);
 
-  const handleAdd = async (formData) => {
-    await addPatient(formData);
-    setModal(null);
+  // ── Open Add modal: fetch a generated ID from backend first ────────────────
+  const openAddModal = async () => {
+    setIdFetching(true);
+    setIdFetchError(null);
+    try {
+      const generatedId = await generatePatientId(); // GET /patient/id
+      setModal({ type: "add", generatedId });
+    } catch (err) {
+      setIdFetchError("Could not generate a Patient ID. Try again.");
+      console.error("generatePatientId failed:", err);
+    } finally {
+      setIdFetching(false);
+    }
   };
 
-  const handleEdit = async (formData) => {
-    await updatePatient(formData);
-    setModal(null);
-  };
+  // ── CRUD handlers ───────────────────────────────────────────────────────────
+  const handleAdd    = async (fd) => { await addPatient(fd);     setModal(null); };
+  const handleEdit   = async (fd) => { await updatePatient(fd);  setModal(null); };
+  const handleDelete = async (id) => { await deletePatient(id);  setModal(null); };
 
-  const handleDelete = async (id) => {
-    await deletePatient(id);
-    setModal(null);
-  };
-
+  // Map full patient details → form initial values for editing
   const openEdit = (details) => {
-    // details is full Patient JSON from /patient/view/det
     const md = details.metadata;
     setModal({
       type: "edit",
       initial: {
-        id:              md.id,
-        name:            md.name,
-        age:             String(md.age || ""),
-        number:          md.number,
-        is_active:       String(md.is_active),
-        last_visit:      md.last_visit || "",
-        follow_up_date:  details.follow_up_date  || "",
-        total_fees_paid: String(details.total_fees_paid || ""),
-        fees_unpaid:     String(details.fees_unpaid     || ""),
-        notes:           details.notes || "",
-        visits:          details.visits || [],
+        id:        md.id,
+        name:      md.name,
+        dob:       md.dob        || "",
+        number:    md.number,
+        condition: md.condition  || "",
+        is_active: String(md.is_active),
       },
     });
   };
 
+  // ── Loading splash ──────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex items-center gap-3 text-slate-400 py-16 justify-center">
@@ -515,23 +640,31 @@ export default function Patients() {
     <div>
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Patients</h1>
-        <p className="mt-1 text-slate-500">
-          Manage all registered patients. Data is stored via the FastAPI backend.
-        </p>
+        <p className="mt-1 text-slate-500">Manage all registered patients.</p>
       </div>
 
+      {/* Backend error */}
       {error && (
         <div className="mb-4 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-sm text-rose-700">
           <p className="font-semibold">Backend connection error</p>
           <p className="font-mono text-xs mt-0.5">{error}</p>
-          <p className="text-xs mt-1">Make sure <code>uvicorn main:app --reload --port 8000</code> is running.</p>
         </div>
       )}
 
-      {/* Toolbar */}
+      {/* ID fetch error */}
+      {idFetchError && (
+        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm
+                        text-amber-700 flex items-start gap-2">
+          <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />
+          <span>{idFetchError}</span>
+        </div>
+      )}
+
+      {/* ── Toolbar ── */}
       <div className="flex flex-col gap-3 mb-5">
         <div className="flex flex-wrap items-center gap-3">
 
+          {/* Search */}
           <div className="relative flex-1 min-w-[200px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input type="text" placeholder="Search by name, ID or number…"
@@ -542,86 +675,30 @@ export default function Patients() {
                          focus:border-transparent transition" />
           </div>
 
+          {/* Sort */}
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-xs text-slate-400 font-semibold flex items-center gap-1">
               <ArrowUpDown size={12} /> Sort:
             </span>
-            <SortButton sortKey="last_visit" currentKey={sortKey} sortDir={sortDir} label="Last Visit"  onClick={handleSort} />
-            <SortButton sortKey="name"       currentKey={sortKey} sortDir={sortDir} label="Name"        onClick={handleSort} />
-            <SortButton sortKey="id"         currentKey={sortKey} sortDir={sortDir} label="Patient ID"  onClick={handleSort} />
-            <SortButton sortKey="age"        currentKey={sortKey} sortDir={sortDir} label="Age"         onClick={handleSort} />
+            <SortButton sortKey="name" currentKey={sortKey} sortDir={sortDir} label="Name"       onClick={handleSort} />
+            <SortButton sortKey="id"   currentKey={sortKey} sortDir={sortDir} label="Patient ID" onClick={handleSort} />
+            <SortButton sortKey="dob"  currentKey={sortKey} sortDir={sortDir} label="Date of Birth" onClick={handleSort} />
           </div>
 
           {/* Filter */}
-          <div className="relative">
-            <button onClick={() => setFilterOpen((o) => !o)}
-              className={`flex items-center gap-2 px-3 py-2.5 text-sm font-semibold
-                border rounded-xl transition whitespace-nowrap
-                ${activeFilterCount > 0
-                  ? "bg-indigo-600 text-white border-indigo-600"
-                  : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"}`}>
-              <Filter size={14} />
-              Filter
-              {activeFilterCount > 0 && (
-                <span className="bg-white/30 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
-                  {activeFilterCount}
-                </span>
-              )}
-              <ChevronDown size={13} className={`transition-transform ${filterOpen ? "rotate-180" : ""}`} />
-            </button>
+          <FilterDropdown
+            filterActive={filterActive}         setFilterActive={setFilterActive}
+            filterConditions={filterConditions} setFilterConditions={setFilterConditions}
+          />
 
-            {filterOpen && (
-              <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-slate-200
-                              rounded-xl shadow-lg p-4 w-56 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-700">Filters</span>
-                  {activeFilterCount > 0 && (
-                    <button onClick={clearFilters}
-                      className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold">
-                      Clear all
-                    </button>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 mb-1.5">Status</p>
-                  <div className="flex gap-2">
-                    {[["all","All"],["active","Active"],["inactive","Inactive"]].map(([val, lbl]) => (
-                      <button key={val} onClick={() => setFilterActive(val)}
-                        className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition
-                          ${filterActive === val
-                            ? "bg-indigo-600 text-white border-indigo-600"
-                            : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"}`}>
-                        {lbl}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 mb-1.5">Age Range</p>
-                  <div className="flex items-center gap-2">
-                    <input type="number" min="0" max="120" placeholder="Min"
-                      value={ageMin} onChange={(e) => setAgeMin(e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg
-                                 focus:outline-none focus:ring-2 focus:ring-indigo-400
-                                 focus:border-transparent transition text-slate-700" />
-                    <span className="text-slate-400 text-xs">to</span>
-                    <input type="number" min="0" max="120" placeholder="Max"
-                      value={ageMax} onChange={(e) => setAgeMax(e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg
-                                 focus:outline-none focus:ring-2 focus:ring-indigo-400
-                                 focus:border-transparent transition text-slate-700" />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <button onClick={() => setModal({ type: "add" })}
+          {/* Add Patient */}
+          <button onClick={openAddModal} disabled={idFetching}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700
-                       text-white text-sm font-semibold px-4 py-2.5 rounded-xl
-                       shadow-sm transition-colors whitespace-nowrap">
-            <UserPlus size={15} />
-            Add Patient
+                       disabled:bg-indigo-400 text-white text-sm font-semibold px-4 py-2.5
+                       rounded-xl shadow-sm transition-colors whitespace-nowrap">
+            {idFetching
+              ? <><Loader2 size={15} className="animate-spin" /> Generating ID…</>
+              : <><UserPlus size={15} /> Add Patient</>}
           </button>
         </div>
 
@@ -632,21 +709,23 @@ export default function Patients() {
               <span className="flex items-center gap-1.5 bg-green-50 text-green-700
                                text-xs font-semibold px-2.5 py-1 rounded-full">
                 {filterActive === "active" ? "Active only" : "Inactive only"}
-                <button onClick={() => setFilterActive("all")} className="hover:text-green-900"><X size={11} /></button>
+                <button onClick={() => setFilterActive("all")}
+                  className="hover:text-green-900"><X size={11} /></button>
               </span>
             )}
-            {(ageMin !== "" || ageMax !== "") && (
-              <span className="flex items-center gap-1.5 bg-amber-50 text-amber-700
+            {filterConditions.length > 0 && (
+              <span className="flex items-center gap-1.5 bg-rose-50 text-rose-700
                                text-xs font-semibold px-2.5 py-1 rounded-full">
-                Age: {ageMin || "0"}–{ageMax || "∞"}
-                <button onClick={() => { setAgeMin(""); setAgeMax(""); }} className="hover:text-amber-900"><X size={11} /></button>
+                Conditions: {filterConditions.join(", ")}
+                <button onClick={() => setFilterConditions([])}
+                  className="hover:text-rose-900"><X size={11} /></button>
               </span>
             )}
           </div>
         )}
       </div>
 
-      {/* Table */}
+      {/* ── Table ── */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
@@ -654,9 +733,9 @@ export default function Patients() {
               <tr>
                 <th className="px-5 py-3 font-semibold">Patient ID</th>
                 <th className="px-5 py-3 font-semibold">Name</th>
-                <th className="px-5 py-3 font-semibold">Number</th>
-                <th className="px-5 py-3 font-semibold">Age</th>
-                <th className="px-5 py-3 font-semibold">Last Visit</th>
+                <th className="px-5 py-3 font-semibold">Contact</th>
+                <th className="px-5 py-3 font-semibold">Date of Birth</th>
+                <th className="px-5 py-3 font-semibold">Condition</th>
                 <th className="px-5 py-3 font-semibold">Active</th>
                 <th className="px-5 py-3 font-semibold">Details</th>
               </tr>
@@ -667,15 +746,18 @@ export default function Patients() {
                   <tr key={p.id} className="hover:bg-slate-50 transition-colors duration-100">
                     <td className="px-5 py-3.5 font-mono text-slate-500 text-xs">{p.id}</td>
                     <td className="px-5 py-3.5 font-medium text-slate-800">{p.name}</td>
-                    <td className="px-5 py-3.5 text-slate-600">{p.number}</td>
-                    <td className="px-5 py-3.5 text-slate-600">{p.age || "—"}</td>
-                    <td className="px-5 py-3.5 text-slate-600">{fmtDate(p.last_visit)}</td>
+                    <td className="px-5 py-3.5 text-slate-600">{p.number || "—"}</td>
+                    <td className="px-5 py-3.5 text-slate-600">{fmtDOB(p.dob)}</td>
+                    <td className="px-5 py-3.5">
+                      {p.condition ? <ConditionBadge condition={p.condition} /> : "—"}
+                    </td>
                     <td className="px-5 py-3.5"><ActiveBadge active={p.is_active} /></td>
                     <td className="px-5 py-3.5">
-                      <button onClick={() => setModal({ type: "view", patientId: p.id })}
-                        className="flex items-center gap-1.5 text-xs font-semibold
-                                   text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50
-                                   px-2.5 py-1.5 rounded-lg transition-colors">
+                      <button
+                        onClick={() => setModal({ type: "view", patientId: p.id })}
+                        className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600
+                                   hover:text-indigo-800 hover:bg-indigo-50 px-2.5 py-1.5
+                                   rounded-lg transition-colors">
                         <Eye size={13} /> View
                       </button>
                     </td>
@@ -698,21 +780,35 @@ export default function Patients() {
         </div>
       </div>
 
-      {/* Modals */}
+      {/* ── Modals ── */}
       {modal?.type === "add" && (
-        <PatientForm title="Add New Patient" initial={EMPTY_FORM} isEdit={false}
-          patients={patients || []} onSave={handleAdd} onClose={() => setModal(null)} />
+        <PatientForm
+          title="Add New Patient"
+          initial={{ ...EMPTY_FORM, id: modal.generatedId || "" }}
+          isEdit={false}
+          idIsGenerated={!!modal.generatedId}
+          patients={patients || []}
+          onSave={handleAdd}
+          onClose={() => setModal(null)}
+        />
       )}
       {modal?.type === "edit" && (
-        <PatientForm title="Edit Patient" initial={modal.initial} isEdit={true}
-          patients={patients || []} onSave={handleEdit} onClose={() => setModal(null)} />
+        <PatientForm
+          title="Edit Patient"
+          initial={modal.initial}
+          isEdit={true}
+          idIsGenerated={false}
+          patients={patients || []}
+          onSave={handleEdit}
+          onClose={() => setModal(null)}
+        />
       )}
       {modal?.type === "view" && (
         <ViewDetailsModal
           patientId={modal.patientId}
           fetchPatientDetails={fetchPatientDetails}
           onClose={() => setModal(null)}
-          onEdit={(details) => openEdit(details)}
+          onEdit={(details) => { setModal(null); openEdit(details); }}
           onDelete={handleDelete}
         />
       )}

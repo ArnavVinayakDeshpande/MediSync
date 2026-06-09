@@ -62,11 +62,9 @@ class PatientManager:
             self._repo.insert(patient)
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
-            self._rollback_id()
             raise PMDatabaseError(exc) from exc
 
         except DatabaseDuplicateEntryError as exc:
-            self._rollback_id()
             raise PMDuplicateEntryError() from exc
 
         else:
@@ -163,7 +161,7 @@ class PatientManager:
             raise PMDatabaseError(exc) from exc
 
     def create_id(self) -> str:
-        id = generate(length=6)
+        id = generate_id(length = 6)
 
         self._reserved_ids.append(id)
 

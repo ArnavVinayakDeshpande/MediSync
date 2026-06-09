@@ -6,8 +6,9 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .database.database import database, Database
-from .managers.patient_manager import patient_manager, PatientManager
+from app.database.database import database, Database
+from app.managers.patient_manager import PatientManager
+import app.managers.patient_manager as patient_Manager
 from .routers.patient import router as patient_router
 
 
@@ -32,10 +33,11 @@ app.add_middleware(
 
 app.include_router(patient_router)
 
+database = Database(get_db_path())
+patient_manager.patient_manager = PatientManager(database)
+
 @app.get("/")
 def root():
     return {"status": "MediSync backend is running"}
 
-database = Database(get_db_path())
-patient_manager = PatientManager(database)
 

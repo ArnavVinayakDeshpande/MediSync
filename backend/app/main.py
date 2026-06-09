@@ -2,53 +2,40 @@
 """
 
 import os
-import pathlib
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .database.database import database
-from .managers.patient_manager import patient_manager
+from .database.database import database, Database
+from .managers.patient_manager import patient_manager, PatientManager
 from .routers.patient import router as patient_router
 
 
-app = None
+def get_db_path() -> Path:
+    path = Path(__file__).parent.parent.parent / "data"
 
-def get_db_path() -> pathlib.Path:
-    curr_dir = Path(__file__).parent
+    db = path / "lenest_database.db"
 
-    wd = curr_dir.parent
+    return db
 
-    db = curr_dir / "data" / "lenest_database.db"
+print(get_db_path())
 
+app = FastAPI(title = "MediSync Backend")
 
-def main():
-    global app
+app.add_middleware(
+        CORSMiddleware,
+        allow_origins = [""],
+        allow_credentials = True,
+        allow_methods = ["*"],
+        allow_headers = ["*"]
+        )
 
-    # Create the fastapi app
-    app = FastAPI(title="MediSync Backend")
+app.include_router(patient_router)
 
-    app.app_middleware(CORSMiddleware,
-                       allow_origins=[
-                           ""
-                           ],
-                       allow_credentials=True,
-                       allow_methods=[
-                            "*"
-                           ],
-                       allow_headers=[
-                           "*"
-                           ]
-                       )
+@app.get("/")
+def root():
+    return {"status": "MediSync backend is running"}
 
-    # Include the routers
-    app.include_router(patient_router)
-
-    # Create database
-    database = Database(get_db_path())
-
-    # Create patient manager
-    patient_manager = PatientManager(database)
-
-if __name__ == "__main__":
-    main()
+database = Database(get_db_path())
+patient_manager = PatientManager(database)
 

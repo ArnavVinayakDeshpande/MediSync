@@ -6,6 +6,8 @@ from datetime import date
 from app.common.id_creater import generate_id
 from app.database.database import Database
 from app.database.patient_repo import PatientRepository
+from app.models.patient import Patient
+from app.models.medical_condition import MedicalCondition
 from .exceptions import *
 
 
@@ -156,7 +158,7 @@ class PatientManager:
         try:
             return self._repo.exists(patient_id)
 
-         except (DatabaseCursorError, DatabaseExecutionError) as exc:
+        except (DatabaseCursorError, DatabaseExecutionError) as exc:
             raise PMDatabaseError() from exc
 
     def create_id(self) -> str:

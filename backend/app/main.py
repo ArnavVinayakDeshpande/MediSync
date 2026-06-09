@@ -1,19 +1,33 @@
 """
 """
 
+import os
+import pathlib
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleWare
+from fastapi.middleware.cors import CORSMiddleware
 
-from database.database import database
-from managers.patient_manager import patient_manager
-from routers.patient import router as patient_router
+from .database.database import database
+from .managers.patient_manager import patient_manager
+from .routers.patient import router as patient_router
+
+
+app = None
+
+def get_db_path() -> pathlib.Path:
+    curr_dir = Path(__file__).parent
+
+    wd = curr_dir.parent
+
+    db = curr_dir / "data" / "lenest_database.db"
 
 
 def main():
+    global app
+
     # Create the fastapi app
     app = FastAPI(title="MediSync Backend")
 
-    app.app_middleware(CORSMiddleWare,
+    app.app_middleware(CORSMiddleware,
                        allow_origins=[
                            ""
                            ],
@@ -30,7 +44,7 @@ def main():
     app.include_router(patient_router)
 
     # Create database
-    database = Database("")
+    database = Database(get_db_path())
 
     # Create patient manager
     patient_manager = PatientManager(database)

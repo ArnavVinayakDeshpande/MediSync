@@ -126,6 +126,25 @@ def getall():
                 detail = "Could not access internal database."
                 )
 
+@router.get("/id")
+def getid():
+    if not patient_manager:
+        raise HTTPException(
+                status_code = 500,
+                detail = "Could not access internal database."
+                )
+
+    try:
+        id = patient_manager.create_id()
+
+        return id
+
+    except PMDatabaseError:
+        raise HTTPException(
+                status_code = 500,
+                detail = "Could not access internal database."
+                )
+
 @router.patch("/{patient_id}")
 def update(patient_id: int, data: Body(...)):
     if not patient_manager:

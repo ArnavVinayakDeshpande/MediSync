@@ -79,6 +79,25 @@ def delete(patient_id: int):
                 detail = "Could not find the patient with the given id."
                 )
 
+@router.get("/id")
+def getid():
+    if not patient_manager:
+        raise HTTPException(
+                status_code = 500,
+                detail = "Could not access internal database."
+                )
+
+    try:
+        id = patient_manager.create_id()
+
+        return id
+
+    except PMDatabaseError:
+        raise HTTPException(
+                status_code = 500,
+                detail = "Could not access internal database."
+                )
+
 @router.get("/{patient_id}")
 def get(patient_id: int):
     if not patient_manager:
@@ -120,25 +139,6 @@ def getall():
 
         return []
     
-    except PMDatabaseError:
-        raise HTTPException(
-                status_code = 500,
-                detail = "Could not access internal database."
-                )
-
-@router.get("/id")
-def getid():
-    if not patient_manager:
-        raise HTTPException(
-                status_code = 500,
-                detail = "Could not access internal database."
-                )
-
-    try:
-        id = patient_manager.create_id()
-
-        return id
-
     except PMDatabaseError:
         raise HTTPException(
                 status_code = 500,

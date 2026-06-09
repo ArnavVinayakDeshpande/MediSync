@@ -25,14 +25,17 @@ def patient_to_json_fmt(patient: Patient) -> dict:
             "name": patient.name,
             "dob": date_to_json_fmt(patient.dob),
             "number": patient.number,
-            "condition": patient.condition,
+            "condition": patient.condition.replace("_", " ").title(),
             "is_active": patient.is_active
             }
 
 def patient_from_json_fmt(data: dict) -> Patient:
-    try:
-        pass
-
-    except KeyError:
-        pass
+    return Patient(
+            id = data["id"],
+            name = data["name"],
+            dob = date_from_json_fmt(data["dob"]),
+            number = data["number"],
+            condition = data["condition"].replace(" ", "_").upper(),
+            is_active = data["is_active"]
+            )
 

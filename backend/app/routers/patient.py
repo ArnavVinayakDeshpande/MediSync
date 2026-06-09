@@ -19,7 +19,6 @@ router = APIRouter(
         tags=["Patients"]
         )
 
-
 # Create
 @router.post("")
 def create(data: dict = Body(...)):
@@ -31,14 +30,7 @@ def create(data: dict = Body(...)):
 
     try:
         created_id = pm.patient_manager.create(
-                Patient(
-                    id=data["id"],
-                    name=data["name"],
-                    dob=date_from_json_fmt(data["dob"]),
-                    number=data["number"],
-                    condition=data["condition"],
-                    is_active=data["is_active"]
-                )
+                patient_from_json_fmt(data)
                 )
 
         return {

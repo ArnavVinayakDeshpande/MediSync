@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database.database import database, Database
 from app.managers.patient_manager import PatientManager
-import app.managers.patient_manager as patient_Manager
+import app.managers.patient_manager as patient_manager
 from .routers.patient import router as patient_router
 
 

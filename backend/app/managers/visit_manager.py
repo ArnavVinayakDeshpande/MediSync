@@ -3,6 +3,7 @@
 
 from datetime import date
 
+from app.common.id_creater import generate_id
 from app.database.database import Database
 from app.database.visit_repo import VisitRepository
 from .exceptions import *

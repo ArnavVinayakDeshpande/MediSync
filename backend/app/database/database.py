@@ -6,7 +6,7 @@ from pathlib import Path
 
 from .exceptions import *
 from .patient_repo import PatientRepository
-from .visits_repo import VisitRepository 
+from .visit_repo import VisitRepository 
 
 
 class Database:

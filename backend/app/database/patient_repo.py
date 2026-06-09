@@ -5,6 +5,7 @@ import sqlite3 as sql3
 
 from .exceptions import *
 from app.models.patient import Patient
+from app.models.medical_condition import MedicalCondition
 from app.common.converter import *
 
 
@@ -19,7 +20,7 @@ class PatientRepository:
             return self.connection.cursor()
 
         except sql3.Error as exc:
-            raise DatabaseCursorError() from exc
+            raise DatabaseCursorError(exc) from exc
 
     def _ensure_initialized(self):
         cursor = self._get_cursor()
@@ -41,7 +42,7 @@ class PatientRepository:
             self.commit()
 
         except sql3.Error as exc:
-            raise DatabaseExecutionError(exc)
+            raise DatabaseExecutionError(exc) from exc
 
         finally:
             cursor.close()
@@ -56,7 +57,7 @@ class PatientRepository:
                     name = data[1],
                     dob = date_from_db_fmt(data[2]),
                     number = data[3],
-                    condition = data[4],
+                    condition = MedicalCondition(data[4]),
                     is_active = data[5]
                     )
 
@@ -90,10 +91,10 @@ class PatientRepository:
                     )
 
         except sql3.IntegrityError:
-            raise DatabaseDuplicateEntryError()
+            raise DatabaseDuplicateEntryError() 
 
         except sql3.Error as exc:
-            raise DatabaseExecutionError(exc)
+            raise DatabaseExecutionError(exc) from exc
 
         finally:
             cursor.close()
@@ -113,7 +114,7 @@ class PatientRepository:
                 raise DatabaseAbsentEntryError()
 
         except sql3.Error as exc:
-            raise DatabaseExecutionError(exc)
+            raise DatabaseExecutionError(exc) from exc
 
         finally:
             cursor.close()
@@ -129,7 +130,7 @@ class PatientRepository:
                     )
 
         except sql3.Error as exc:
-            raise DatabaseExecutionError(exc)
+            raise DatabaseExecutionError(exc) from exc
 
         finally:
             cursor.close()
@@ -150,7 +151,7 @@ class PatientRepository:
             return self._create_patient(data)
 
         except sql3.Error as exc:
-            raise DatabaseExecutionError(exc)
+            raise DatabaseExecutionError(exc) from exc
 
         finally:
             cursor.close()
@@ -175,7 +176,7 @@ class PatientRepository:
             return patients
 
         except sql3.Error as exc:
-            raise DatabaseExecutionError(exc)
+            raise DatabaseExecutionError(exc) from exc
 
         finally:
             cursor.close()
@@ -193,7 +194,7 @@ class PatientRepository:
             return [row[0] for row in cursor.fetchall()]
 
         except sql3.Error as exc:
-            raise DatabaseExecutionError(exc)
+            raise DatabaseExecutionError(exc) from exc
 
     def update(self, patient: Patient):
         cursor = self._get_cursor()
@@ -224,7 +225,7 @@ class PatientRepository:
                 raise DatabaseAbsentEntryError()
 
         except sql3.Error as exc:
-            raise DatabaseExecutionError(exc)
+            raise DatabaseExecutionError(exc) from exc
 
         finally:
             cursor.close()
@@ -243,7 +244,7 @@ class PatientRepository:
             return cursor.fetchone() is not None
 
         except sql3.Error as exc:
-             raise DatabaseExecutionError(exc)
+             raise DatabaseExecutionError(exc) from exc
 
         finally:
             cursor.close()
@@ -253,5 +254,5 @@ class PatientRepository:
             self.connection.commit()
 
         except sql3.Error as exc:
-            raise DatabaseExecutionError(exc)
+            raise DatabaseExecutionError(exc) from exc
 

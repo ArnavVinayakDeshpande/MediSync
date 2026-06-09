@@ -5,6 +5,7 @@ from datetime import date
 
 from app.common.id_creater import generate_id
 from app.database.database import Database
+from app.database.exceptions import *
 from app.database.patient_repo import PatientRepository
 from app.models.patient import Patient
 from app.models.medical_condition import MedicalCondition
@@ -18,13 +19,13 @@ class PatientManager:
         self._repo = self.database.patient_repo
 
         if self._repo is None:
-            raise PMDatabaseError()
+            raise PMDatabaseError(DatabaseCursorError())
 
         self._reserved_ids: list[str] = []
 
     def _validate(self):
         if self._repo is None:
-            raise PMDatabaseError()
+            raise PMDatabaseError(DatabaseCursorError())
 
     def _validate_inputs(
             self,
@@ -62,15 +63,15 @@ class PatientManager:
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
             self._rollback_id()
-            raise PMDatabaseError() from exc
+            raise PMDatabaseError(exc) from exc
 
-        except DatabaseDuplicateEntryError:
+        except DatabaseDuplicateEntryError as exc:
             self._rollback_id()
-            raise PMDuplicateEntryError()
+            raise PMDuplicateEntryError() from exc
 
         else:
             self._repo.commit()
-            return patient.id 
+            return patient.id
 
     def delete(self, patient_id: str):
         self._validate()
@@ -79,22 +80,22 @@ class PatientManager:
             self._repo.delete(patient_id)
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
-            raise PMDatabaseError() from exc
+            raise PMDatabaseError(exc) from exc
 
-        except DatabaseAbsentEntryError:
-            raise PMAbsentEntryError()
+        except DatabaseAbsentEntryError as exc:
+            raise PMAbsentEntryError() from exc
 
         else:
             self._repo.commit()
 
     def clear(self):
         self._validate()
-        
+
         try:
             self._repo.clear()
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
-            raise PMDatabaseError() from exc
+            raise PMDatabaseError(exc) from exc
 
         else:
             self._repo.commit()
@@ -106,7 +107,7 @@ class PatientManager:
             return self._repo.get(patient_id)
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
-            raise PMDatabaseError() from exc
+            raise PMDatabaseError(exc) from exc
 
     def getall(self):
         self._validate()
@@ -115,7 +116,7 @@ class PatientManager:
             return self._repo.getall()
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
-            raise PMDatabaseError() from exc
+            raise PMDatabaseError(exc) from exc
 
     def update(
             self,
@@ -144,10 +145,10 @@ class PatientManager:
             self._repo.update(patient)
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
-            raise PMDatabaseError() from exc
+            raise PMDatabaseError(exc) from exc
 
-        except DatabaseAbsentEntryError:
-            raise PMAbsentEntryError()
+        except DatabaseAbsentEntryError as exc:
+            raise PMAbsentEntryError() from exc
 
         else:
             self._repo.commit()
@@ -159,14 +160,15 @@ class PatientManager:
             return self._repo.exists(patient_id)
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
-            raise PMDatabaseError() from exc
+            raise PMDatabaseError(exc) from exc
 
     def create_id(self) -> str:
-        id = generate(length = 6)
+        id = generate(length=6)
 
         self._reserved_ids.append(id)
 
         return id
+
 
 patient_manager: PatientManager | None = None
 

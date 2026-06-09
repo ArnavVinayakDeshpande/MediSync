@@ -18,14 +18,27 @@ class Database:
         self.visit_repo = None
 
         try:
-            self.connection = sql3.connect(self.filepath)
+            self.connection = sql3.connect(
+                    self.filepath,
+                    check_same_thread = False
+                    )
+            self.connection.execute(
+                    """
+                    PRAGMA foreign_keys = ON
+                    """
+                    )
 
         except sql3.Error as exc:
-            raise DatabaseDisconnectedError() from exc
+            raise DatabaseDisconnectedError(exc) from exc
 
         else:
-            self.patient_repo = PatientRepository(self.connection)
-            self.visit_repo = VisitRepository(self.connection)
+            try:
+                self.patient_repo = PatientRepository(self.connection)
+                self.visit_repo = VisitRepository(self.connection)
+
+            except sql3.Error as exc:
+                self.connection.close()
+                raise DatabaseDisconnectedError(exc) from exc
 
 database: Database | None = None
 

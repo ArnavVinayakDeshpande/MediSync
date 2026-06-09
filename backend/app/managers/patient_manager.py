@@ -3,6 +3,7 @@
 
 from datetime import date
 
+from app.common.id_creater import generate_id
 from app.database.database import Database
 from app.database.patient_repo import PatientRepository
 from .exceptions import *
@@ -17,19 +18,7 @@ class PatientManager:
         if self._repo is None:
             raise PMDatabaseError()
 
-        self._last_id = self._get_last_id()
-
-    def _get_last_id(self):
-        try:
-            ids = self._repo.getids()
-
-            return max(ids) + 1 if ids else 1
-
-        except (DatabaseCursorError, DatabasExecutionError) as exc:
-            raise PMDatabaseError() from exc
-
-    def _rollback_id(self):
-        self._last_id -= 1
+        self._reserved_ids: list[str] = []
 
     def _validate(self):
         if self._repo is None:
@@ -57,40 +46,15 @@ class PatientManager:
             except:
                 raise PMInvalidInputsError()
 
-    def _create_patient(
-            self,
-            name: str,
-            dob: date | None,
-            number: str,
-            condition: str,
-            is_active: bool) -> tuple[int, Patient]:
-        self._validate_inputs(name, dob, number)
-
-        patient_id = self._last_id
-        self._last_id += 1
-
-        return patient_id, Patient(
-                id = patient_id,
-                name = name,
-                dob = dob,
-                number = number,
-                condition = condition,
-                is_active = is_active
-                )
-
     def create(
             self,
-            name: str,
-            dob: date | None,
-            number: str,
-            condition: str,
-            is_active: bool) -> int:
+            patient: Patient) -> str:
         self._validate()
 
         try:
-            patient_id, patient = self._create_patient(
-                    name, dob, number, condition, is_active
-                    )
+            # Check if it is a reserved id
+            if patient.id in self._reserved_ids:
+                self._reserved_ids.erase(patient.id)
 
             self._repo.insert(patient)
 
@@ -104,10 +68,9 @@ class PatientManager:
 
         else:
             self._repo.commit()
-            return patient_id
+            return patient.id 
 
-
-    def delete(self, patient_id: int):
+    def delete(self, patient_id: str):
         self._validate()
 
         try:
@@ -134,7 +97,7 @@ class PatientManager:
         else:
             self._repo.commit()
 
-    def get(self, patient_id: int) -> Patient | None:
+    def get(self, patient_id: str) -> Patient | None:
         self._validate()
 
         try:
@@ -154,7 +117,7 @@ class PatientManager:
 
     def update(
             self,
-            patient_id: int,
+            patient_id: str,
             name: str | None = None,
             dob: date | None = None,
             number: str | None = None,
@@ -186,6 +149,22 @@ class PatientManager:
 
         else:
             self._repo.commit()
+
+    def exists(self, patient_id: str) -> bool:
+        self._validate()
+
+        try:
+            return self._repo.exists(patient_id)
+
+         except (DatabaseCursorError, DatabaseExecutionError) as exc:
+            raise PMDatabaseError() from exc
+
+    def create_id(self) -> str:
+        id = generate(length = 6)
+
+        self._reserved_ids.append(id)
+
+        return id
 
 patient_manager: PatientManager | None = None
 

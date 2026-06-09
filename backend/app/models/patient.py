@@ -12,7 +12,7 @@ from app.common.converter import date_to_json_fmt, date_from_json_fmt
 
 @dataclass
 class Patient:
-    id: int
+    id: str
     name: str
     dob: _date | None
     number: str

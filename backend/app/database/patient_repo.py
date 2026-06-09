@@ -29,7 +29,7 @@ class PatientRepository:
                     """
                     CREATE TABLE IF NOT EXISTS 
                            patients (
-                               id INT PRIMARY KEY,
+                               id TEXT PRIMARY KEY NOT NULL,
                                name TEXT NOT NULL,
                                dob TEXT,
                                number TEXT UNIQUE,
@@ -98,7 +98,7 @@ class PatientRepository:
         finally:
             cursor.close()
 
-    def delete(self, patient_id: int):
+    def delete(self, patient_id: str):
         cursor = self._get_cursor()
 
         try:
@@ -134,7 +134,7 @@ class PatientRepository:
         finally:
             cursor.close()
 
-    def get(self, patient_id: int) -> Patient | None:
+    def get(self, patient_id: str) -> Patient | None:
         cursor = self._get_cursor()
 
         try:
@@ -180,7 +180,7 @@ class PatientRepository:
         finally:
             cursor.close()
 
-    def getids(self) -> list[int]:
+    def getids(self) -> list[str]:
         cursor = self._get_cursor()
 
         try:
@@ -225,6 +225,25 @@ class PatientRepository:
 
         except sql3.Error as exc:
             raise DatabaseExecutionError(exc)
+
+        finally:
+            cursor.close()
+
+    def exists(self, patient_id: str) -> bool:
+        cursor = self._get_cursor()
+
+        try:
+            cursor.execute(
+                    """
+                    SELECT name FROM patients WHERE id = ?
+                    """,
+                    (patient_id,)
+                    )
+
+            return cursor.fetchone() is not None
+
+        except sql3.Error as exc:
+             raise DatabaseExecutionError(exc)
 
         finally:
             cursor.close()

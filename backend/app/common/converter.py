@@ -21,7 +21,7 @@ def date_from_json_fmt(dt: str | None) -> date | None:
     return datetime.strptime(dt, "%d-%m-%Y") if dt else None
 
 def condition_object_to_str(condition: MedicalCondition) -> str:
-    return condition.replace("_", " ").title()
+    return condition.replace("_", " ").title() if condition != MedicalCondition.PCOS else "PCOS"
 
 def condition_str_to_object(mc_text: str) -> MedicalCondition:
     return mc.replace(" ", "_").upper()

@@ -19,6 +19,7 @@ export function DataProvider({ children }) {
   const [error, setError] = useState(null);
 
   const templatesRef = useRef(null);
+  const patientsQueryRef = useRef({});
 
   useEffect(() => {
     templatesRef.current = templates;
@@ -28,12 +29,23 @@ export function DataProvider({ children }) {
   // Load Patients
   // ─────────────────────────────────────────────────────────────
 
-  const refreshPatients = useCallback(async () => {
+  const refreshPatients = useCallback(async (filters = patientsQueryRef.current) => {
     try {
-      const res = await fetch("/patients");
+      patientsQueryRef.current = filters || {};
+
+      const params = new URLSearchParams();
+      Object.entries(patientsQueryRef.current).forEach(([key, value]) => {
+        if (value !== null && value !== undefined && value !== "") {
+          params.set(key, String(value));
+        }
+      });
+
+      const query = params.toString();
+      const url = query ? `/patients?${query}` : "/patients";
+      const res = await fetch(url);
 
       if (!res.ok) {
-        throw new Error(`GET /patients → ${res.status}`);
+        throw new Error(`GET ${url} failed with status ${res.status}`);
       }
 
       const data = await res.json();

@@ -12,10 +12,49 @@ import { useData } from "../context/DataContext";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CONDITIONS = [
-  "Pregnancy",
-  "Condition 2", "Condition 3", "Condition 4",  "Condition 5",
-  "Condition 6", "Condition 7", "Condition 8",  "Condition 9", "Condition 10",
+  "Normal Pregnancy",
+  "High Risk Pregnancy",
+  "Gestatational Diabetes",
+  "Gestatational Hypertension",
+  "Preeclamsia",
+  "Placenta Previa",
+  "Preterm Labour",
+  "Multiple Pregnancy",
+  "Intrauterine Growth Restriction",
+  "Post Term Pregnancy",
+  "HyperMesis Gravidarum",
+  "PCOS",
+  "Endometriosis",
+  "Uterine Fibroids",
+  "Adenomyosis",
+  "Ovarian Cyst",
+  "Menstrual Disorder",
+  "Amenorrhea",
+  "Dysmenorrhea",
+  "Abnormal Uterine Bleeding",
+  "Pelvic Inflammatory Disease",
+  "Vaginitis",
+  "Cervicitis",
+  "Infertility",
+  "Menopausal Symptoms",
+  "None",
 ];
+
+const PREGNANCY_CONDITIONS = new Set([
+  "Normal Pregnancy",
+  "High Risk Pregnancy",
+  "Gestatational Diabetes",
+  "Gestatational Hypertension",
+  "Preeclamsia",
+  "Placenta Previa",
+  "Preterm Labour",
+  "Multiple Pregnancy",
+  "Intrauterine Growth Restriction",
+  "Post Term Pregnancy",
+  "HyperMesis Gravidarum",
+]);
+
+const PAGE_SIZE = 50;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -39,7 +78,7 @@ function ActiveBadge({ active }) {
 }
 
 function ConditionBadge({ condition }) {
-  const isPregnancy = condition === "Pregnancy";
+  const isPregnancy = PREGNANCY_CONDITIONS.has(condition);
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold
       ${isPregnancy ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-600"}`}>
@@ -436,7 +475,14 @@ function SortButton({ sortKey, sortDir, currentKey, label, onClick }) {
 //  Filter Dropdown
 // ─────────────────────────────────────────────────────────────────────────────
 
-function FilterDropdown({ filterActive, setFilterActive, filterConditions, setFilterConditions }) {
+function FilterDropdown({
+  filterActive,
+  setFilterActive,
+  filterCondition,
+  setFilterCondition,
+  filterAge,
+  setFilterAge,
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -446,16 +492,16 @@ function FilterDropdown({ filterActive, setFilterActive, filterConditions, setFi
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const toggleCondition = (c) =>
-    setFilterConditions((prev) =>
-      prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]
-    );
-
   const activeCount =
-    (filterActive !== "all" ? 1 : 0) +
-    (filterConditions.length > 0 ? 1 : 0);
+    (filterActive !== null ? 1 : 0) +
+    (filterCondition !== null ? 1 : 0) +
+    (filterAge !== null ? 1 : 0);
 
-  const clearAll = () => { setFilterActive("all"); setFilterConditions([]); };
+  const clearAll = () => {
+    setFilterActive(null);
+    setFilterCondition(null);
+    setFilterAge(null);
+  };
 
   return (
     <div className="relative" ref={ref}>
@@ -492,7 +538,7 @@ function FilterDropdown({ filterActive, setFilterActive, filterConditions, setFi
           <div>
             <p className="text-xs font-semibold text-slate-500 mb-1.5">Status</p>
             <div className="flex gap-2">
-              {[["all", "All"], ["active", "Active"], ["inactive", "Inactive"]].map(([val, lbl]) => (
+              {[[null, "All"], [true, "Active"], [false, "Inactive"]].map(([val, lbl]) => (
                 <button key={val} onClick={() => setFilterActive(val)}
                   className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition
                     ${filterActive === val
@@ -507,21 +553,37 @@ function FilterDropdown({ filterActive, setFilterActive, filterConditions, setFi
           {/* Condition */}
           <div>
             <p className="text-xs font-semibold text-slate-500 mb-1.5">Condition</p>
-            <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
-              {CONDITIONS.map((c) => {
-                const checked = filterConditions.includes(c);
-                return (
-                  <label key={c}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50
-                               cursor-pointer text-xs text-slate-700">
-                    <input type="checkbox" checked={checked}
-                      onChange={() => toggleCondition(c)}
-                      className="accent-indigo-600" />
-                    {c}
-                  </label>
-                );
-              })}
-            </div>
+            <select
+              value={filterCondition ?? ""}
+              onChange={(e) => setFilterCondition(e.target.value || null)}
+              className="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg bg-white
+                         text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400
+                         focus:border-transparent transition"
+            >
+              <option value="">All conditions</option>
+              {CONDITIONS.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Age */}
+          <div>
+            <p className="text-xs font-semibold text-slate-500 mb-1.5">Age</p>
+            <input
+              type="number"
+              min="0"
+              max="120"
+              value={filterAge ?? ""}
+              onChange={(e) => {
+                const value = e.target.value;
+                setFilterAge(value === "" ? null : Number(value));
+              }}
+              placeholder="Any age"
+              className="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg bg-white
+                         text-slate-700 placeholder-slate-400 focus:outline-none
+                         focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition"
+            />
           </div>
         </div>
       )}
@@ -536,6 +598,7 @@ function FilterDropdown({ filterActive, setFilterActive, filterConditions, setFi
 export default function Patients() {
   const {
     patients, loading, error,
+    refreshPatients,
     generatePatientId,
     addPatient, updatePatient, deletePatient, fetchPatientDetails,
   } = useData();
@@ -543,8 +606,10 @@ export default function Patients() {
   const [query,            setQuery]            = useState("");
   const [sortKey,          setSortKey]          = useState("name");
   const [sortDir,          setSortDir]          = useState("asc");
-  const [filterActive,     setFilterActive]     = useState("all");
-  const [filterConditions, setFilterConditions] = useState([]);
+  const [filterActive,    setFilterActive]    = useState(null);
+  const [filterCondition, setFilterCondition] = useState(null);
+  const [filterAge,       setFilterAge]       = useState(null);
+  const [page,            setPage]            = useState(0);
   const [modal,            setModal]            = useState(null);
   const [idFetching,       setIdFetching]       = useState(false);
   const [idFetchError,     setIdFetchError]     = useState(null);
@@ -555,8 +620,34 @@ export default function Patients() {
   };
 
   const activeFilterCount =
-    (filterActive !== "all" ? 1 : 0) +
-    (filterConditions.length > 0 ? 1 : 0);
+    (filterActive !== null ? 1 : 0) +
+    (filterCondition !== null ? 1 : 0) +
+    (filterAge !== null ? 1 : 0);
+
+  useEffect(() => {
+    refreshPatients({
+      size: PAGE_SIZE,
+      offset: page * PAGE_SIZE,
+      condition: filterCondition,
+      active: filterActive,
+      age: filterAge,
+    });
+  }, [refreshPatients, page, filterCondition, filterActive, filterAge]);
+
+  const updateFilterActive = (value) => {
+    setFilterActive(value);
+    setPage(0);
+  };
+
+  const updateFilterCondition = (value) => {
+    setFilterCondition(value);
+    setPage(0);
+  };
+
+  const updateFilterAge = (value) => {
+    setFilterAge(value);
+    setPage(0);
+  };
 
   // ── Filtered + sorted list ──────────────────────────────────────────────────
   const displayed = useMemo(() => {
@@ -571,12 +662,6 @@ export default function Patients() {
       );
     }
 
-    if (filterActive === "active")   list = list.filter((p) =>  p.is_active);
-    if (filterActive === "inactive") list = list.filter((p) => !p.is_active);
-
-    if (filterConditions.length > 0)
-      list = list.filter((p) => filterConditions.includes(p.condition));
-
     list.sort((a, b) => {
       let av, bv;
       if (sortKey === "name") { av = a.name.toLowerCase();    bv = b.name.toLowerCase(); }
@@ -588,7 +673,7 @@ export default function Patients() {
     });
 
     return list;
-  }, [patients, query, filterActive, filterConditions, sortKey, sortDir]);
+  }, [patients, query, sortKey, sortDir]);
 
   // ── Open Add modal: fetch a generated ID from backend first ────────────────
   const openAddModal = async () => {
@@ -687,8 +772,9 @@ export default function Patients() {
 
           {/* Filter */}
           <FilterDropdown
-            filterActive={filterActive}         setFilterActive={setFilterActive}
-            filterConditions={filterConditions} setFilterConditions={setFilterConditions}
+            filterActive={filterActive}       setFilterActive={updateFilterActive}
+            filterCondition={filterCondition} setFilterCondition={updateFilterCondition}
+            filterAge={filterAge}             setFilterAge={updateFilterAge}
           />
 
           {/* Add Patient */}
@@ -705,20 +791,28 @@ export default function Patients() {
         {/* Active filter chips */}
         {activeFilterCount > 0 && (
           <div className="flex flex-wrap gap-2">
-            {filterActive !== "all" && (
+            {filterActive !== null && (
               <span className="flex items-center gap-1.5 bg-green-50 text-green-700
                                text-xs font-semibold px-2.5 py-1 rounded-full">
-                {filterActive === "active" ? "Active only" : "Inactive only"}
-                <button onClick={() => setFilterActive("all")}
+                {filterActive ? "Active only" : "Inactive only"}
+                <button onClick={() => updateFilterActive(null)}
                   className="hover:text-green-900"><X size={11} /></button>
               </span>
             )}
-            {filterConditions.length > 0 && (
+            {filterCondition !== null && (
               <span className="flex items-center gap-1.5 bg-rose-50 text-rose-700
                                text-xs font-semibold px-2.5 py-1 rounded-full">
-                Conditions: {filterConditions.join(", ")}
-                <button onClick={() => setFilterConditions([])}
+                Condition: {filterCondition}
+                <button onClick={() => updateFilterCondition(null)}
                   className="hover:text-rose-900"><X size={11} /></button>
+              </span>
+            )}
+            {filterAge !== null && (
+              <span className="flex items-center gap-1.5 bg-sky-50 text-sky-700
+                               text-xs font-semibold px-2.5 py-1 rounded-full">
+                Age: {filterAge}
+                <button onClick={() => updateFilterAge(null)}
+                  className="hover:text-sky-900"><X size={11} /></button>
               </span>
             )}
           </div>
@@ -775,8 +869,31 @@ export default function Patients() {
             </tbody>
           </table>
         </div>
-        <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 text-xs text-slate-400">
-          Showing {displayed.length} of {(patients || []).length} patients
+        <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 text-xs text-slate-500
+                        flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <span>
+            Page {page + 1} · Showing {displayed.length} of up to {PAGE_SIZE} patients
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600
+                         font-semibold hover:border-indigo-300 disabled:opacity-50
+                         disabled:cursor-not-allowed transition"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={(patients || []).length < PAGE_SIZE}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600
+                         font-semibold hover:border-indigo-300 disabled:opacity-50
+                         disabled:cursor-not-allowed transition"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
 

@@ -7,7 +7,7 @@ from fastapi import Body
 from fastapi import Query
 
 from app.models.visit import Visit
-import app.models.visit_manager as vm
+import app.managers.visit_manager as vm
 from app.common.converter import *
 
 

@@ -23,15 +23,28 @@ class PatientManager:
 
         self._reserved_ids: list[str] = []
 
+        self._id_len = 6
+
     def _validate(self):
         if self._repo is None:
             raise PMDatabaseError(DatabaseCursorError())
 
     def _validate_inputs(
             self,
+            id: str | None,
             name: str | None,
             dob: date | None,
             number: str | None):
+        if id is not None:
+            if not id:
+                raise PMInvalidInputsError()
+
+            if len(id) != self._id_len:
+                raise PMInvalidInputsError()
+
+            if id != id.upper():
+                raise PMInvalidInputsError()
+
         if name is not None:
             if not name:
                 raise PMInvalidInputsError()
@@ -136,7 +149,7 @@ class PatientManager:
 
             patient.name = name if name else patient.name
             patient.dob = dob if dob else patient.dob
-            patient.number = number if dob else patient.number
+            patient.number = number if number else patient.number
             patient.condition = condition if condition else patient.condition
             patient.is_active = is_active if is_active else patient.is_active
 
@@ -161,7 +174,7 @@ class PatientManager:
             raise PMDatabaseError(exc) from exc
 
     def create_id(self) -> str:
-        id = generate_id(length = 6)
+        id = generate_id(length = self._id_len)
 
         self._reserved_ids.append(id)
 

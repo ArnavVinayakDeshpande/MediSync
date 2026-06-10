@@ -138,11 +138,23 @@ class VisitManager:
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
            raise VMDatabaseError(exc) from exc
 
-    def getall(self, patient_id: str) -> list[Visit]:
+    def getall(
+            self,
+            patient_id: str | None = None,
+            size: int | None = None,
+            offset: int | None = None,
+            fees_pending: bool | None = None,
+            follow_up: bool | None = None) -> list[Visit]:
         self._validate()
 
         try:
-            return self._repo.getall(patient_id)
+            return self._repo.getall(
+                    patient_id = patient_id,
+                    size = size,
+                    offset = offset,
+                    fees_pending = fees_pending,
+                    follow_up = follow_up
+                    )
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
             raise VMDatabaseError(exc) from exc

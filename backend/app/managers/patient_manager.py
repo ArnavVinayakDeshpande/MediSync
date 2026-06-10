@@ -120,11 +120,24 @@ class PatientManager:
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
             raise PMDatabaseError(exc) from exc
 
-    def getall(self):
+    def getall(
+            self,
+            size: int | None = None,
+            offset: int | None = None,
+            condition: MedicalCondition | None = None,
+            active: bool | None = None,
+            age: int | None = None
+            ):
         self._validate()
 
         try:
-            return self._repo.getall()
+            return self._repo.getall(
+                    size,
+                    offset,
+                    condition,
+                    active,
+                    age
+                    )
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
             raise PMDatabaseError(exc) from exc

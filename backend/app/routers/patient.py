@@ -188,7 +188,7 @@ def update(patient_id: str, data: dict = Body(...)):
                     if "dob" in data else None
                 ),
                 number = data.get("number"),
-                condition = condition_str_to_object(data.get("condition"),
+                condition = condition_str_to_object(data.get("condition")),
                 is_active = data.get("is_active")
                 )
 

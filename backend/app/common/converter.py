@@ -5,6 +5,7 @@ from datetime import datetime, date
 
 from app.models.patient import Patient
 from app.models.visit import Visit
+from app.models.medical_condition import MedicalCondition
 
 
 def date_to_db_fmt(dt: date | None) -> str | None:

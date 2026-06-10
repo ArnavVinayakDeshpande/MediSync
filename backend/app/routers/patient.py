@@ -4,6 +4,7 @@
 from fastapi import APIRouter
 from fastapi import HTTPException
 from fastapi import Body
+from fastapi import Query
 
 import app.managers.patient_manager as pm
 
@@ -19,7 +20,6 @@ router = APIRouter(
         tags=["Patients"]
         )
 
-
 # Create
 @router.post("")
 def create(data: dict = Body(...)):
@@ -31,14 +31,7 @@ def create(data: dict = Body(...)):
 
     try:
         created_id = pm.patient_manager.create(
-                Patient(
-                    id=data["id"],
-                    name=data["name"],
-                    dob=date_from_json_fmt(data["dob"]),
-                    number=data["number"],
-                    condition=data["condition"],
-                    is_active=data["is_active"]
-                )
+                patient_from_json_fmt(data)
                 )
 
         return {
@@ -146,7 +139,13 @@ def get(patient_id: str):
 
 # Get all patients
 @router.get("")
-def getall():
+def getall(
+        size: int | None = Query(default = None),
+        offset: int | None = Query(default = None),
+        condition: str | None = Query(default = None),
+        active: bool | None = Query(default = None),
+        age: int | None = Query(default = None)
+        ):
     if pm.patient_manager is None:
         raise HTTPException(
                 status_code=500,
@@ -154,12 +153,17 @@ def getall():
                 )
 
     try:
-        data = pm.patient_manager.getall()
+        data = pm.patient_manager.getall(
+                size,
+                offset,
+                condition_object_to_str(condition) if condition else None,
+                active,
+                age
+                )
 
-        if data:
-            return [patient_to_json_fmt(d) for d in data]
+        # Do age later
 
-        return []
+        return [patient_to_json_fmt(d) for d in data]
 
     except PMDatabaseError as exc:
         raise HTTPException(

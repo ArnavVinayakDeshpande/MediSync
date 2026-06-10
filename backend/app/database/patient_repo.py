@@ -167,24 +167,44 @@ class PatientRepository:
         finally:
             cursor.close()
 
-    def getall(self) -> list[Patient]:
+    def getall(
+            self,
+            size: int | None = None,
+            offset: int | None = None,
+            condition: MedicalCondition | None = None,
+            active: bool | None = None,
+            age: int | None = None # Implement later
+            ) -> list[Patient]:
         cursor = self._get_cursor()
 
+        query = "SELECT * FROM patients"
+        params = []
+        filters = []
+
         try:
+            if condition is not None:
+                filters.append("condition = ?")
+                params.append(condition)
+
+            if active is not None:
+                filters.append("is_active = ?")
+                params.append(int(active))
+
+            if filters:
+                query += " WHERE " + " AND ".join(filters)
+
+            query += " ORDER BY name DESC LIMIT ? OFFSET ?"
+            params.append(size if size else -1)
+            params.append(offset if offset is not None else 0)
+
             cursor.execute(
-                    """
-                    SELECT * FROM patients
-                    """
+                    query,
+                    params
                     )
 
             data = cursor.fetchall()
 
-            patients = []
-
-            for d in data:
-                patients.append(self._create_patient(d))
-
-            return patients
+            return [self._create_patient(d) for d in data]
 
         except sql3.Error as exc:
             raise DatabaseExecutionError(exc) from exc

@@ -57,7 +57,7 @@ class PatientManager:
         try:
             # Check if it is a reserved id
             if patient.id in self._reserved_ids:
-                self._reserved_ids.erase(patient.id)
+                self._reserved_ids.remove(patient.id)
 
             self._repo.insert(patient)
 

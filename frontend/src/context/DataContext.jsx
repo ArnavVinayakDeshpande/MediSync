@@ -97,16 +97,24 @@ export function DataProvider({ children }) {
   // ─────────────────────────────────────────────────────────────
 
   function buildPatientJson(formData) {
-    return {
-      name: formData.name,
-      dob: formData.dob || "",
-      number: formData.number,
-      condition: formData.condition || "",
-      is_active:
-        formData.is_active === true ||
-        formData.is_active === "true",
-    };
+  let formattedDob = "";
+
+  if (formData.dob) {
+    const [year, month, day] = formData.dob.split("-");
+    formattedDob = `${day}-${month}-${year}`;
   }
+
+  return {
+    id: formData.id,
+    name: formData.name,
+    dob: formattedDob,
+    number: formData.number,
+    condition: formData.condition || "",
+    is_active:
+      formData.is_active === true ||
+      formData.is_active === "true",
+  };
+}
 
   // ─────────────────────────────────────────────────────────────
   // Add Patient

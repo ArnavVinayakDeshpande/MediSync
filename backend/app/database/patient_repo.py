@@ -52,16 +52,27 @@ class PatientRepository:
             return None
 
         try:
+            print("ID:", data[0])
+            print("NAME:", data[1])
+
+            print("RAW DOB:", data[2])
+            dob = date_from_db_fmt(data[2])
+
+            print("RAW CONDITION:", data[4])
+            condition = MedicalCondition(data[4])
+
             return Patient(
-                    id = data[0],
-                    name = data[1],
-                    dob = date_from_db_fmt(data[2]),
-                    number = data[3],
-                    condition = MedicalCondition(data[4]),
-                    is_active = data[5]
-                    )
+                id=data[0],
+                name=data[1],
+                dob=dob,
+                number=data[3],
+                condition=condition,
+                is_active=data[5]
+            )
 
         except Exception as exc:
+            import traceback
+            traceback.print_exc()
             raise DatabaseParsingError() from exc
 
     def insert(self, patient: Patient):

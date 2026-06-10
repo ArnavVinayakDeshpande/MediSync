@@ -10,7 +10,8 @@ from app.database.database import Database
 import app.database.database as db
 from app.managers.patient_manager import PatientManager
 import app.managers.patient_manager as patient_manager
-from .routers.patient import router as patient_router
+from app.routers.patient import router as patient_router
+from app.routers.visit import router as visit_router
 
 
 def get_db_path() -> Path:
@@ -33,6 +34,7 @@ app.add_middleware(
         )
 
 app.include_router(patient_router)
+app.include_router(visit_router)
 
 db.database = Database(get_db_path())
 patient_manager.patient_manager = PatientManager(db.database)

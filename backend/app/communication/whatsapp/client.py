@@ -2,6 +2,9 @@
 """
 
 import requests
+from requests.exceptions import RequestException
+
+from app.communication.whatsapp.exceptions import *
 
 
 class WhatsAppClient:
@@ -16,21 +19,31 @@ class WhatsAppClient:
         self._business_account_id = business_account_id
         self._api_version = api_version
 
-    def _headers(self) -> dict[str, str]:
+    def _build_url(self, endpoint: str) -> str:
+        return self.api_base_url + "/" + endpoint
+
+    @property
+    def headers(self) -> dict[str, str]:
         return {
                 "Authorization": f"Bearer {self._access_token}",
                 "Content-Type": "application/json"
                 }
-
-    def _build_url(self, endpoint: str) -> str:
-        return self.api_base_url + "/" + endpoint
 
     @property
     def api_base_url(self) -> str:
         return f"https://graph.facebook.com/{self._api_version}"
 
     @property
-    def phone_number_id
+    def phone_number_id(self) -> str:
+        return self._phone_number_id
+
+    @property
+    def business_account_id(self) -> str:
+        return self._business_account_id
+
+    @property
+    def api_version(self) -> str:
+        return self._api_version
 
     @property
     def api_message_endpoint(self) -> str:
@@ -40,47 +53,64 @@ class WhatsAppClient:
     def api_template_endpoint(self) -> str:
         return f"{self._business_account_id}/message_templates"
 
+    def _send(
+            self,
+            method,
+            **kwargs
+            ) -> requests.Response:
+        try:
+            response = method(timeout = 30, **kwargs)
+            response.raise_for_status()
+            return response
+
+        except RequestException as exc:
+            raise WhatsAppAPIError(exc) from exc
+
     def get(
             self,
             endpoint: str,
-            params: dict | None = None) -> requests.Response:
-        return requests.get(
+            params: dict | None = None
+        ) -> requests.Response:
+        return self._send(
+                requests.get,
                 url = self._build_url(endpoint),
-                headers = self._headers(),
-                params = params,
-                timeout = 30
+                headers = self.headers,
+                params = params
                 )
 
     def post(
             self,
             endpoint: str,
-            body: dict) -> requests.Response:
-        return requests.post(
+            body: dict
+        ) -> requests.Response:
+        return self._send(
+                requests.post,
                 url = self._build_url(endpoint),
-                headers = self._headers(),
-                json = body,
-                timeout = 30
+                headers = self.headers,
+                json = body
                 )
 
     def put(
             self,
             endpoint: str,
-            body: dict) -> requests.Response:
-        return requests.put(
+            body: dict
+            ) -> requests.Response:
+        return self._send(
+                requests.put,
                 url = self._build_url(endpoint),
-                headers = self._headers(),
-                json = body,
-                timeout = 30
-                ) 
+                headers = self.headers,
+                json = body
+                )
 
     def delete(
             self,
             endpoint: str,
-            params: dict | None = None) -> requests.Response:
-        return requests.delete(
+            params: dict | None = None
+            ) -> requests.Response:
+        return self._send(
+                requests.delete,
                 url = self._build_url(endpoint),
-                headers = self._headers(),
-                params = params,
-                timeout = 30
+                headers = self.headers,
+                params = params
                 )
 

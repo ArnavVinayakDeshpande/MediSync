@@ -4,9 +4,11 @@
 from fastapi import APIRouter
 from fastapi import HTTPException
 from fastapi import Body
+from fastapi import Query
 
 from app.models.visit import Visit
 import app.models.visit_manager as vm
+from app.common.converter import *
 
 
 router = APIRouter(
@@ -15,23 +17,157 @@ router = APIRouter(
         )
 
 # Create
-def create():
-    pass
+@router.post("")
+def create(data: dict = Body(...)):
+    if vm.visit_manager is None:
+        raise HTTException(
+                status_code = 500,
+                detail = "Visit Manager has not been initialized."
+                )
 
-def delete():
-    pass
+    try:
+        created_id = vm.visit_manager.create(
+                visit_from_json_fmt(data)
+                )
 
-def deleteall():
-    pass
+        return {
+                "visit_id": created_id,
+                "sucesss": True
+                }
 
+    except VMDuplicateEntryError as exc:
+        raise HTTPException(
+                status_code = 409,
+                detail = str(exc)
+                ) from exc
+
+    except VMInvalidInputsError as exc:
+        raise HTTPException(
+                status_code = 400,
+                detail = str(exc)
+                ) from exc
+
+    except VMDatabaseError as exc:
+        raise HTTPException(
+                status_code = 500,
+                detail = str(exc)
+                ) from ex c
+
+    except (KeyERror, ValueError) as exc:
+        raise HTTPException(
+                status_code = 400,
+                detail = "Malformed request body."
+                ) from exc
+
+@router.delete("/{visit_id}")
+def delete(visit_id: str):
+    if vm.visit_manager is None:
+        raise HTTPException(
+                status_code = 500,
+                detail = "Visit Manager has not been initialized."
+                )
+
+    try:
+        vm.visit_manager.delete(visit_id)
+
+        return {"success": True}
+
+    except VMAbsentEntryError as exc:
+        raise HTTPException(
+                status_code = 404,
+                detail = str(exc)
+                ) from exc
+
+    except VMDatabaseError as exc:
+        raise HTTPException(
+                status_code = 500,
+                detail = str(exc)
+                ) from exc
+
+@router.delete("")
+def deleteall(patient_id: str = Query()):
+    if vm.visit_manager is None:
+        raise HTTPException(
+                status_code = 500,
+                detail = "Visit Manager has not been initialized."
+                )
+
+    try:
+        vm.visit_manager.deletall(patient_id)
+
+        return {"success": True}
+
+    except VMDatabaseError as exc:
+        raise HTTPException(
+                status_code = 500,
+                detail = str(exc)
+                ) from exc
+
+@router.get("/id")
 def getid():
-    pass
+    if vm.visit_manager is None:
+        raise HTTPException(
+                status_code = 500,
+                detail = "Visit Manager has not been initialized."
+                )
 
-def get():
-    pass
+    return vm.visit_manager.create_id()
 
-def getall():
-    pass
+@router.get("/{visit_id}")
+def get(visit_id: str):
+    if vm.visit_manager is None:
+        raise HTTPException(
+                status_code = 500,
+                deteail = "Visit Manager has not been initialized."
+                )
+
+    try:
+        data = vm.visit_manager.get(visit_id)
+
+        if data is None:
+            raise HTTPException(
+                    status_code = 404,
+                    detail = "The requested visit does not exist."
+                    )
+
+        return visit_to_json_fmt(data)
+
+    except VMDatabaseError as exc:
+        raise HTTPException(
+                status_code = 500,
+                detail = str(exc)
+                ) from exc
+
+@router.get("")
+def getall(
+        patient_id: str | None = Query(default = None),
+        size: int | None = Query(default = None),
+        offset: int | None = Query(default = None),
+        fees_pending: bool | None = Query(default = None),
+        follow_up: bool | None = Query(default = None)
+        ):
+    if vm.visit_manager is None:
+        raise HTTPException(
+                status_code = 500,
+                detail = "Visit Manager has not been initialized."
+                )
+
+    try:
+        data = vm.visit_manager.getall(
+                patient_id,
+                size,
+                offset,
+                fees_pending,
+                follow_up
+                )
+
+        return [visit_to_json_fmt(d) for d in data]
+
+    except VMDatabaseError as exc:
+        raise HTTPException(
+                status_code = 500,
+                detail = str(exc)
+                ) from exc
 
 def update():
     pass

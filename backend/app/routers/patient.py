@@ -26,7 +26,7 @@ def create(data: dict = Body(...)):
     if pm.patient_manager is None:
         raise HTTPException(
                 status_code=500,
-                detail="Patient manager is not initialized."
+                detail="Patient Manager has not been initialized."
                 )
 
     try:
@@ -63,7 +63,6 @@ def create(data: dict = Body(...)):
                 detail="Malformed request body."
                 ) from exc
 
-
 # Delete
 @router.delete("/{patient_id}")
 def delete(patient_id: str):
@@ -89,7 +88,6 @@ def delete(patient_id: str):
                 status_code=500,
                 detail=str(exc)
                 ) from exc
-
 
 # Reserve / create ID
 @router.get("/id")

@@ -45,8 +45,6 @@ class WhatsAppMessengerService:
                 body = payload
                 )
 
-        response.raise_for_status() # Wrap in an try: except latert
-
         body = response.json()
 
         return body["messages"][0]["id"]
@@ -60,17 +58,20 @@ class WhatsAppMessengerService:
                 "template": {
                     "name": message.template_name,
                     "language": {
+                        "policy": "deterministic",
                         "code": message.language.value
                         }
                     },
                 "components": [
-                    "type": "body",
-                    "parameters": [
-                        {
-                            "type": "text",
-                            "text": parameter
-                        } for parameter in message.parameters
-                        ]
+                    {
+                        "type": "body",
+                        "parameters": [
+                            {
+                                "type": "text",
+                                "text": parameter
+                                } for parameter in message.parameters
+                            ]
+                        }
                     ]
                 }
 
@@ -78,8 +79,6 @@ class WhatsAppMessengerService:
                 endpoint = self._client.api_message_endpoint,
                 body = payload
                 )
-
-        response.raise_for_status() # Wrap in an try: except latert
 
         body = response.json()
 

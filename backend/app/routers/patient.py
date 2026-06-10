@@ -16,8 +16,8 @@ from app.common.converter import *
 
 
 router = APIRouter(
-        prefix="/patients",
-        tags=["Patients"]
+        prefix = "/patients",
+        tags = ["Patients"]
         )
 
 # Create
@@ -25,8 +25,8 @@ router = APIRouter(
 def create(data: dict = Body(...)):
     if pm.patient_manager is None:
         raise HTTPException(
-                status_code=500,
-                detail="Patient Manager has not been initialized."
+                status_code = 500,
+                detail = "Patient Manager has not been initialized."
                 )
 
     try:
@@ -41,26 +41,26 @@ def create(data: dict = Body(...)):
 
     except PMDuplicateEntryError as exc:
         raise HTTPException(
-                status_code=409,
-                detail=str(exc)
+                status_code = 409,
+                detail = str(exc)
                 ) from exc
 
     except PMInvalidInputsError as exc:
         raise HTTPException(
-                status_code=400,
-                detail=str(exc)
+                status_code = 400,
+                detail = str(exc)
                 ) from exc
 
     except PMDatabaseError as exc:
         raise HTTPException(
-                status_code=500,
-                detail=str(exc)
+                status_code = 500,
+                detail = str(exc)
                 ) from exc
 
     except (KeyError, ValueError) as exc:
         raise HTTPException(
-                status_code=400,
-                detail="Malformed request body."
+                status_code = 400,
+                detail = "Malformed request body."
                 ) from exc
 
 # Delete
@@ -68,8 +68,8 @@ def create(data: dict = Body(...)):
 def delete(patient_id: str):
     if pm.patient_manager is None:
         raise HTTPException(
-                status_code=500,
-                detail="Patient manager is not initialized."
+                status_code = 500,
+                detail = "Patient Manager has not been initialized."
                 )
 
     try:
@@ -79,14 +79,14 @@ def delete(patient_id: str):
 
     except PMAbsentEntryError as exc:
         raise HTTPException(
-                status_code=404,
-                detail=str(exc)
+                status_code = 404,
+                detail = str(exc)
                 ) from exc
 
     except PMDatabaseError as exc:
         raise HTTPException(
-                status_code=500,
-                detail=str(exc)
+                status_code = 500,
+                detail = str(exc)
                 ) from exc
 
 # Reserve / create ID
@@ -94,8 +94,8 @@ def delete(patient_id: str):
 def getid():
     if pm.patient_manager is None:
         raise HTTPException(
-                status_code=500,
-                detail="Patient manager is not initialized."
+                status_code = 500,
+                detail = "Patient Manager has not been initialized."
                 )
 
     try:
@@ -103,8 +103,8 @@ def getid():
 
     except PMDatabaseError as exc:
         raise HTTPException(
-                status_code=500,
-                detail=str(exc)
+                status_code = 500,
+                detail = str(exc)
                 ) from exc
 
 
@@ -113,8 +113,8 @@ def getid():
 def get(patient_id: str):
     if pm.patient_manager is None:
         raise HTTPException(
-                status_code=500,
-                detail="Patient manager is not initialized."
+                status_code = 500,
+                detail = "Patient Manager has not been initialized."
                 )
 
     try:
@@ -122,16 +122,16 @@ def get(patient_id: str):
 
         if data is None:
             raise HTTPException(
-                    status_code=404,
-                    detail="The requested patient does not exist."
+                    status_code = 404,
+                    detail = "The requested patient does not exist."
                     )
 
         return patient_to_json_fmt(data)
 
     except PMDatabaseError as exc:
         raise HTTPException(
-                status_code=500,
-                detail=str(exc)
+                status_code = 500,
+                detail = str(exc)
                 ) from exc
 
 
@@ -146,8 +146,8 @@ def getall(
         ):
     if pm.patient_manager is None:
         raise HTTPException(
-                status_code=500,
-                detail="Patient manager is not initialized."
+                status_code = 500,
+                detail = "Patient Manager has not been initialized."
                 )
 
     try:
@@ -165,8 +165,8 @@ def getall(
 
     except PMDatabaseError as exc:
         raise HTTPException(
-                status_code=500,
-                detail=str(exc)
+                status_code = 500,
+                detail = str(exc)
                 ) from exc
 
 
@@ -175,46 +175,46 @@ def getall(
 def update(patient_id: str, data: dict = Body(...)):
     if pm.patient_manager is None:
         raise HTTPException(
-                status_code=500,
-                detail="Patient manager is not initialized."
+                status_code = 500,
+                detail = "Patient Manager has not been initialized."
                 )
 
     try:
         pm.patient_manager.update(
-                patient_id=patient_id,
-                name=data.get("name"),
-                dob=(
+                patient_id = patient_id,
+                name = data.get("name"),
+                dob = (
                     date_from_json_fmt(data["dob"])
                     if "dob" in data else None
                 ),
-                number=data.get("number"),
-                condition=data.get("condition"),
-                is_active=data.get("is_active")
+                number = data.get("number"),
+                condition = data.get("condition"),
+                is_active = data.get("is_active")
                 )
 
         return {"success": True}
 
     except PMAbsentEntryError as exc:
         raise HTTPException(
-                status_code=404,
-                detail=str(exc)
+                status_code = 404,
+                detail = str(exc)
                 ) from exc
 
     except PMInvalidInputsError as exc:
         raise HTTPException(
-                status_code=400,
-                detail=str(exc)
+                status_code = 400,
+                detail = str(exc)
                 ) from exc
 
     except PMDatabaseError as exc:
         raise HTTPException(
-                status_code=500,
-                detail=str(exc)
+                status_code = 500,
+                detail = str(exc)
                 ) from exc
 
     except (KeyError, ValueError) as exc:
         raise HTTPException(
-                status_code=400,
-                detail="Malformed request body."
+                status_code = 400,
+                detail = "Malformed request body."
                 ) from exc
 

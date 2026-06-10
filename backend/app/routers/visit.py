@@ -20,7 +20,7 @@ router = APIRouter(
 @router.post("")
 def create(data: dict = Body(...)):
     if vm.visit_manager is None:
-        raise HTTException(
+        raise HTTPException(
                 status_code = 500,
                 detail = "Visit Manager has not been initialized."
                 )
@@ -32,7 +32,7 @@ def create(data: dict = Body(...)):
 
         return {
                 "visit_id": created_id,
-                "sucesss": True
+                "sucess": True
                 }
 
     except VMDuplicateEntryError as exc:
@@ -51,9 +51,9 @@ def create(data: dict = Body(...)):
         raise HTTPException(
                 status_code = 500,
                 detail = str(exc)
-                ) from ex c
+                ) from exc
 
-    except (KeyERror, ValueError) as exc:
+    except (KeyError, ValueError) as exc:
         raise HTTPException(
                 status_code = 400,
                 detail = "Malformed request body."
@@ -93,7 +93,7 @@ def deleteall(patient_id: str = Query()):
                 )
 
     try:
-        vm.visit_manager.deletall(patient_id)
+        vm.visit_manager.deleteall(patient_id)
 
         return {"success": True}
 
@@ -118,7 +118,7 @@ def get(visit_id: str):
     if vm.visit_manager is None:
         raise HTTPException(
                 status_code = 500,
-                deteail = "Visit Manager has not been initialized."
+                detail = "Visit Manager has not been initialized."
                 )
 
     try:
@@ -169,6 +169,58 @@ def getall(
                 detail = str(exc)
                 ) from exc
 
-def update():
-    pass
+@router.patch("/{visit_id}")
+def update(visit_id: str, data: dict = Body(...)):
+    if vm.visit_manager is None:
+        raise HTTPException(
+                status_code = 500,
+                detail = "Visit Manager has not been initialized."
+                )
+
+    try:
+        visit = visit_from_json_fmt(data)
+
+        if visit.id != visit_id:
+            exc = VMInvalidInputsError()
+            raise HTTPException(
+                    status_code = 400,
+                    detail = str(exc)
+                    ) from exc
+
+        vm.visit_manager.update(
+                visit_id = visit_id,
+                date = visit.date,
+                diagnosis = visit.diagnosis,
+                prescription = visit.prescription,
+                notes = visit.notes,
+                fees_paid = visit.fees_paid,
+                fees_pending = visit.fees_pending,
+                follow_up_date = visit.follow_up_date
+                )
+
+        return {"success": True}
+
+    except VMAbsentEntryError as exc:
+        raise HTTPException(
+                status_code = 404,
+                detail = str(exc)
+                ) from exc
+
+    except VMInvalidInputsError as exc:
+        raise HTTPException(
+                status_code = 400,
+                detail = str(exc)
+                ) from exc
+
+    except VMDatabaseError as exc:
+        raise HTTPException(
+                status_code = 500,
+                detail = str(exc)
+                ) from exc
+
+    except (KeyError, ValueError) as exc:
+        raise HTTPException(
+                status_code = 400,
+                detail = "Malformed request body."
+                ) from exc
 

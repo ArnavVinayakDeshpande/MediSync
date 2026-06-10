@@ -191,15 +191,47 @@ class VisitRepository:
         finally:
             cursor.close()
 
-    def getall(self, patient_id: str) -> list[Visit]:
+    def getall(
+            self,
+            patient_id: str | None = None,
+            size: int | None = None,
+            offset: int | None = None ,
+            fees_pending: bool | None = None,
+            follow_up: bool | None = None
+            ) -> list[Visit]:
         cursor = self._get_cursor()
 
+        query = "SELECT * FROM visits"
+        params = []
+        filters = []
+
         try:
+            if patient_id:
+                filters.append(" pid = ?")
+                params.append(patient_id)
+
+            if fees_pending is not None:
+                if fees_pending:
+                    filters.append(" fees_pending > 0")
+                else:
+                    filters.append(" fees_pending = 0")
+
+            if follow_up is not None:
+                if follow_up:
+                    filters.append(" follow_up_date IS NOT NULL")
+                else:
+                    filters.append(" follow_up_date IS NULL")
+
+            if filters:
+                query += " WHERE " + " AND ".join(filters)
+
+            query += " ORDER BY date DESC LIMIT  ? OFFSET  ?"
+            params.append(size if size else -1)
+            params.append(offset if offset is not None else 0)
+
             cursor.execute(
-                """
-                SELECT * FROM visits WHERE pid = ?
-                """,
-                (patient_id,),
+                    query,
+                    params
             )
 
             data = cursor.fetchall()

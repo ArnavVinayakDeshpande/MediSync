@@ -18,13 +18,13 @@ def date_to_json_fmt(dt: date | None) -> str | None:
     return dt.strftime("%d-%m-%Y") if dt else None
 
 def date_from_json_fmt(dt: str | None) -> date | None:
-    return datetime.strptime("%d-%m-%Y") if dt else None
+    return datetime.strptime(dt, "%d-%m-%Y") if dt else None
 
 def condition_object_to_str(condition: MedicalCondition) -> str:
     return condition.replace("_", " ").title() if condition != MedicalCondition.PCOS else "PCOS"
 
-def condition_str_to_object(mc_text: str) -> MedicalCondition:
-    return mc.replace(" ", "_").upper()
+def condition_str_to_object(condition: str) -> MedicalCondition:
+    return condition.replace(" ", "_").upper()
 
 def patient_to_json_fmt(patient: Patient) -> dict:
     return {

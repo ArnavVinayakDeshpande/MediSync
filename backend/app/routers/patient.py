@@ -154,7 +154,7 @@ def getall(
         data = pm.patient_manager.getall(
                 size,
                 offset,
-                condition_object_to_str(condition) if condition else None,
+                condition_str_to_object(condition) if condition else None,
                 active,
                 age
                 )
@@ -188,7 +188,7 @@ def update(patient_id: str, data: dict = Body(...)):
                     if "dob" in data else None
                 ),
                 number = data.get("number"),
-                condition = data.get("condition"),
+                condition = condition_str_to_object(data.get("condition"),
                 is_active = data.get("is_active")
                 )
 

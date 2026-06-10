@@ -153,7 +153,7 @@ class PatientManager:
         self._validate()
 
         try:
-            self._validate_inputs(name, dob, number)
+            self._validate_inputs(patient_id, name, dob, number)
 
             patient = self.get(patient_id)
 

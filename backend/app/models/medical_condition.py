@@ -5,6 +5,8 @@ from enum import StrEnum
 
 
 class MedicalCondition(StrEnum):
+    NONE = "NONE"
+
     PCOS = "PCOS"
     ENDOMETRIOSIS = "ENDOMETRIOSIS"
     UTERINE_FIBROIDS = "UTERINE_FIBROIDS"

@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import StrEnum, auto
 
 from app.communication.whatsapp.exceptions import *
-from app.communication.whatsapp.template.language import WhatsAppTemplateLanguage
+from app.communication.whatsapp.template import WhatsAppTemplateLanguage
 
 
 class WhatsAppMessageType(StrEnum):

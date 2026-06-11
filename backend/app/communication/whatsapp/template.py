@@ -47,6 +47,7 @@ class WhatsAppTemplateStatus(StrEnum):
 class WhatsAppTemplate:
     id: str
     name: str
+    meta_id: str | None
     language: WhatsAppTemplateLanguage
     category: WhatsAppTemplateCategory
     body: str

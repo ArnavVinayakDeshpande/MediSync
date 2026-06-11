@@ -6,8 +6,9 @@ from fastapi import HTTPException
 from fastapi import Body
 from fastapi import Query
 
-from app.models.visit import Visit
 import app.managers.visit_manager as vm
+from app.managers.exceptions import *
+from app.models.visit import Visit
 from app.common.converter import *
 
 
@@ -27,7 +28,8 @@ def create(data: dict = Body(...)):
 
     try:
         created_id = vm.visit_manager.create(
-                visit_from_json_fmt(data)
+                patient_id = data["patient_id"],
+                visit = visit_from_json_fmt(data)
                 )
 
         return {

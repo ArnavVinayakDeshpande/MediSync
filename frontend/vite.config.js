@@ -11,10 +11,10 @@ export default defineConfig({
   server: {
     proxy: {
       // ── Node.js / Express (appointments, templates) ─────────────────────
-      '/api': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-      },
+      // '/api': {
+      //   target: 'http://localhost:3001',
+      //   changeOrigin: true,
+      // },
 
       // ── New patient REST API ─────────────────────────────────────────────
       // IMPORTANT: '/patients' must be listed BEFORE '/patient' below.
@@ -27,17 +27,10 @@ export default defineConfig({
         changeOrigin: true,
       },
 
-      // ── Old FastAPI patient routes (kept until fully migrated) ───────────
-      '/patient': {
-        target: 'http://127.0.0.1:8000 ',
-        changeOrigin: true,
-      },
-
-      // ── FastAPI template routes ──────────────────────────────────────────
-      '/templates': {
-        target: 'http://127.0.0.1:8000 ',
-        changeOrigin: true,
-      },
+      '/visits': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true
+      }
     }
   }
 })

@@ -7,7 +7,6 @@ from fastapi import Body
 from fastapi import Query
 
 import app.managers.patient_manager as pm
-
 from app.managers.exceptions import *
 from app.models.patient import *
 from app.models.visit import *

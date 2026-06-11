@@ -7,295 +7,198 @@ import {
   useState,
   useEffect,
   useCallback,
-  useRef,
 } from "react";
 
 const DataContext = createContext(null);
 
+const API = "";
+
 export function DataProvider({ children }) {
-  const [patients, setPatients] = useState(null);
-  const [templates, setTemplates] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [patients, setPatients] = useState([]);
+  const [visits,   setVisits]   = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState(null);
 
-  const templatesRef = useRef(null);
-  const patientsQueryRef = useRef({});
+  // --------------------------------------------------
+  // Generic Request Helper
+  // --------------------------------------------------
 
-  useEffect(() => {
-    templatesRef.current = templates;
-  }, [templates]);
+  const request = useCallback(async (url, options = {}) => {
+    const res = await fetch(`${API}${url}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+      ...options,
+    });
 
-  // ─────────────────────────────────────────────────────────────
-  // Load Patients
-  // ─────────────────────────────────────────────────────────────
+    if (!res.ok) {
+      let err = {};
+      try { err = await res.json(); } catch {}
+      throw new Error(err.detail || `${options.method || "GET"} ${url} failed (${res.status})`);
+    }
 
-  const refreshPatients = useCallback(async (filters = patientsQueryRef.current) => {
+    if (res.status === 204) return null;
+
+    try { return await res.json(); } catch { return null; }
+  }, []);
+
+  // --------------------------------------------------
+  // Patients
+  // --------------------------------------------------
+
+  const refreshPatients = useCallback(async (filters = {}) => {
     try {
-      patientsQueryRef.current = filters || {};
-
       const params = new URLSearchParams();
-      Object.entries(patientsQueryRef.current).forEach(([key, value]) => {
-        if (value !== null && value !== undefined && value !== "") {
-          params.set(key, String(value));
-        }
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "")
+          params.append(key, value);
       });
-
-      const query = params.toString();
-      const url = query ? `/patients?${query}` : "/patients";
-      const res = await fetch(url);
-
-      if (!res.ok) {
-        throw new Error(`GET ${url} failed with status ${res.status}`);
-      }
-
-      const data = await res.json();
-
-      setPatients(data);
+      const url = params.toString() ? `/patients?${params}` : "/patients";
+      const data = await request(url);
+      setPatients(data || []);
       setError(null);
     } catch (err) {
-      console.error("Failed to load patients:", err);
       setError(err.message);
       setPatients([]);
     }
-  }, []);
-
-  // ─────────────────────────────────────────────────────────────
-  // Load Templates
-  // ─────────────────────────────────────────────────────────────
-
-  const refreshTemplates = useCallback(async () => {
-    try {
-      const res = await fetch("/api/data");
-
-      if (!res.ok) {
-        throw new Error(`GET /api/data → ${res.status}`);
-      }
-
-      const data = await res.json();
-
-      setTemplates(data.templates || []);
-    } catch (err) {
-      console.error("Failed to load templates:", err);
-      setTemplates([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    Promise.all([
-      refreshPatients(),
-      refreshTemplates(),
-    ]).finally(() => setLoading(false));
-  }, [refreshPatients, refreshTemplates]);
-
-  // ─────────────────────────────────────────────────────────────
-  // Generate Patient ID
-  // ─────────────────────────────────────────────────────────────
+  }, [request]);
 
   const generatePatientId = useCallback(async () => {
-    const res = await fetch("/patients/id");
+    return await request("/patients/id");
+  }, [request]);
 
-    if (!res.ok) {
-      throw new Error(`GET /patients/id → ${res.status}`);
+  const addPatient = useCallback(async (patient) => {
+    await request("/patients", {
+      method: "POST",
+      body: JSON.stringify(patient),
+    });
+    await refreshPatients();
+  }, [request, refreshPatients]);
+
+  const updatePatient = useCallback(async (patient) => {
+    await request(`/patients/${patient.id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patient),
+    });
+    await refreshPatients();
+  }, [request, refreshPatients]);
+
+  const deletePatient = useCallback(async (patientId) => {
+    // delete the patient's visits first, then the patient
+    await request(`/visits?patient_id=${patientId}`, { method: "DELETE" });
+    await request(`/patients/${patientId}`,           { method: "DELETE" });
+    await refreshPatients();
+  }, [request, refreshPatients]);
+
+  const getPatient = useCallback(async (patientId) => {
+    return await request(`/patients/${patientId}`);
+  }, [request]);
+
+  // --------------------------------------------------
+  // Visits
+  // --------------------------------------------------
+
+  const refreshVisits = useCallback(async (filters = {}) => {
+    try {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "")
+          params.append(key, value);
+      });
+      const url = params.toString() ? `/visits?${params}` : "/visits";
+      const data = await request(url);
+      setVisits(data || []);
+      setError(null);
+      return data || [];
+    } catch (err) {
+      setError(err.message);
+      setVisits([]);
+      return [];
     }
+  }, [request]);
 
-    const data = await res.json();
+  // Calls GET /visits/id  →  backend returns the next auto-generated visit ID.
+  // The response can be either a plain string ("V001") or an object ({ "id": "V001" }).
+  // AddVisitModal in Visits.jsx handles both shapes.
+  const generateVisitId = useCallback(async () => {
+    return await request("/visits/id");
+  }, [request]);
 
-    return String(data);
-  }, []);
+  const getVisit = useCallback(async (visitId) => {
+    return await request(`/visits/${visitId}`);
+  }, [request]);
 
-  // ─────────────────────────────────────────────────────────────
-  // Build Request Body
-  // Matches FastAPI create endpoint
-  // ─────────────────────────────────────────────────────────────
+  const addVisit = useCallback(async (visitData) => {
+    await request("/visits", {
+      method: "POST",
+      body: JSON.stringify(visitData),
+    });
+    await refreshVisits();
+  }, [request, refreshVisits]);
 
-  function buildPatientJson(formData) {
-  let formattedDob = "";
+  const updateVisit = useCallback(async (visitId, visitData) => {
+    await request(`/visits/${visitId}`, {
+      method: "PATCH",
+      body: JSON.stringify(visitData),
+    });
+    await refreshVisits();
+  }, [request, refreshVisits]);
 
-  if (formData.dob) {
-    const [year, month, day] = formData.dob.split("-");
-    formattedDob = `${day}-${month}-${year}`;
-  }
+  const deleteVisit = useCallback(async (visitId) => {
+    await request(`/visits/${visitId}`, { method: "DELETE" });
+    await refreshVisits();
+  }, [request, refreshVisits]);
 
-  return {
-    id: formData.id,
-    name: formData.name,
-    dob: formattedDob,
-    number: formData.number,
-    condition: formData.condition || "",
-    is_active:
-      formData.is_active === true ||
-      formData.is_active === "true",
-  };
-}
+  // --------------------------------------------------
+  // Patient Details  (patient metadata + their visits)
+  // --------------------------------------------------
 
-  // ─────────────────────────────────────────────────────────────
-  // Add Patient
-  // POST /patients
-  // ─────────────────────────────────────────────────────────────
+  const fetchPatientDetails = useCallback(async (patientId) => {
+    const [patient, patientVisits] = await Promise.all([
+      request(`/patients/${patientId}`),
+      request(`/visits?patient_id=${patientId}`),
+    ]);
+    return {
+      metadata: patient,
+      visits:   patientVisits || [],
+    };
+  }, [request]);
 
-  const addPatient = useCallback(
-    async (formData) => {
-      const body = buildPatientJson(formData);
+  // --------------------------------------------------
+  // Initial Load
+  // --------------------------------------------------
 
-      const res = await fetch("/patients", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const err = await res
-          .json()
-          .catch(() => ({}));
-
-        throw new Error(
-          err.detail || "Failed to add patient"
-        );
-      }
-
-      await refreshPatients();
-    },
-    [refreshPatients]
-  );
-
-  // ─────────────────────────────────────────────────────────────
-  // Update Patient
-  // PATCH /patients/{id}
-  // NOTE:
-  // Backend implementation currently incomplete.
-  // ─────────────────────────────────────────────────────────────
-
-  const updatePatient = useCallback(
-    async (formData) => {
-      const body = buildPatientJson(formData);
-
-      const res = await fetch(
-        `/patients/${formData.id}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(body),
-        }
-      );
-
-      if (!res.ok) {
-        const err = await res
-          .json()
-          .catch(() => ({}));
-
-        throw new Error(
-          err.detail || "Failed to update patient"
-        );
-      }
-
-      await refreshPatients();
-    },
-    [refreshPatients]
-  );
-
-  // ─────────────────────────────────────────────────────────────
-  // Delete Patient
-  // DELETE /patients/{id}
-  // ─────────────────────────────────────────────────────────────
-
-  const deletePatient = useCallback(
-    async (id) => {
-      const res = await fetch(
-        `/patients/${id}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (!res.ok) {
-        const err = await res
-          .json()
-          .catch(() => ({}));
-
-        throw new Error(
-          err.detail || "Failed to delete patient"
-        );
-      }
-
-      await refreshPatients();
-    },
-    [refreshPatients]
-  );
-
-  // ─────────────────────────────────────────────────────────────
-  // Get Patient Details
-  // GET /patients/{id}
-  // ─────────────────────────────────────────────────────────────
-
-  const fetchPatientDetails = useCallback(
-    async (id) => {
-      const res = await fetch(
-        `/patients/${id}`
-      );
-
-      if (!res.ok) {
-        throw new Error(
-          `Patient ${id} not found`
-        );
-      }
-
-      return await res.json();
-    },
-    []
-  );
-
-  // ─────────────────────────────────────────────────────────────
-  // Template Updates
-  // ─────────────────────────────────────────────────────────────
-
-  const updateTemplate = useCallback(
-    async (week, message) => {
-      const next = (templatesRef.current || []).map(
-        (t) =>
-          t.week === week
-            ? { ...t, message }
-            : t
-      );
-
-      setTemplates(next);
-
-      await fetch("/api/templates", {
-        method: "POST",
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-        body: JSON.stringify({
-          templates: next,
-        }),
-      });
-    },
-    []
-  );
-
-  const isLoaded =
-    patients !== null &&
-    templates !== null;
+  useEffect(() => {
+    Promise.all([refreshPatients(), refreshVisits()])
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [refreshPatients, refreshVisits]);
 
   return (
     <DataContext.Provider
       value={{
-        patients,
-        templates,
         loading,
         error,
-        isLoaded,
+
+        patients,
+        visits,
+
         refreshPatients,
         generatePatientId,
+        getPatient,
         addPatient,
         updatePatient,
         deletePatient,
+
+        refreshVisits,
+        generateVisitId,
+        getVisit,
+        addVisit,
+        updateVisit,
+        deleteVisit,
+
         fetchPatientDetails,
-        updateTemplate,
       }}
     >
       {children}
@@ -304,13 +207,9 @@ export function DataProvider({ children }) {
 }
 
 export function useData() {
-  const ctx = useContext(DataContext);
-
-  if (!ctx) {
-    throw new Error(
-      "useData must be used inside <DataProvider>"
-    );
+  const context = useContext(DataContext);
+  if (!context) {
+    throw new Error("useData must be used inside <DataProvider>");
   }
-
-  return ctx;
+  return context;
 }

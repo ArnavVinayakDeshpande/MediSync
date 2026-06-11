@@ -13,6 +13,7 @@ import {
   ClockAlert,
   CalendarCheck,
   CalendarX,
+  ClipboardList,
 } from "lucide-react";
 
 function NavItem({ to, label, Icon }) {
@@ -121,6 +122,7 @@ export default function Sidebar() {
 
         <NavItem to="/dashboard"         label="Dashboard"          Icon={LayoutDashboard} />
         <NavItem to="/patients"          label="Patients"           Icon={Users} />
+        <NavItem to="/visits"            label="Visits"             Icon={ClipboardList} />
 
         <NavGroup label="Appointments" Icon={CalendarDays}>
           <SubNavItem to="/appointments/requests"  label="Requests Pending"  Icon={ClockAlert} />

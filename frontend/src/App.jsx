@@ -14,6 +14,7 @@ import PastAppointments      from "./pages/appointments/PastAppointments";
 import SendMessages          from "./pages/SendMessages";
 import MessageTemplates      from "./pages/MessageTemplates";
 import SettingsPage          from "./pages/Settings";
+import Visits from "./pages/Visits";
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
                 <Route path="/send-messages"           element={<SendMessages />} />
                 <Route path="/message-templates"       element={<MessageTemplates />} />
                 <Route path="/settings"                element={<SettingsPage />} />
+                <Route path="/visits" element={<Visits />} />
               </Route>
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

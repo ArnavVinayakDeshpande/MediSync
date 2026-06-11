@@ -1,57 +1,31 @@
 // src/pages/Patients.jsx
-//
-// Patient fields: Patient ID · Name · Date of Birth · Contact Number · Condition · Active
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import {
   Search, UserPlus, Eye, Pencil, Trash2, X, AlertCircle,
   ArrowUpDown, Filter, ChevronDown, ArrowUp, ArrowDown, Loader2,
+  History,
 } from "lucide-react";
 import { useData } from "../context/DataContext";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CONDITIONS = [
-  "Normal Pregnancy",
-  "High Risk Pregnancy",
-  "Gestatational Diabetes",
-  "Gestatational Hypertension",
-  "Preeclamsia",
-  "Placenta Previa",
-  "Preterm Labour",
-  "Multiple Pregnancy",
-  "Intrauterine Growth Restriction",
-  "Post Term Pregnancy",
-  "HyperMesis Gravidarum",
-  "PCOS",
-  "Endometriosis",
-  "Uterine Fibroids",
-  "Adenomyosis",
-  "Ovarian Cyst",
-  "Menstrual Disorder",
-  "Amenorrhea",
-  "Dysmenorrhea",
-  "Abnormal Uterine Bleeding",
-  "Pelvic Inflammatory Disease",
-  "Vaginitis",
-  "Cervicitis",
-  "Infertility",
-  "Menopausal Symptoms",
-  "None",
+  "Normal Pregnancy", "High Risk Pregnancy", "Gestatational Diabetes",
+  "Gestatational Hypertension", "Preeclamsia", "Placenta Previa",
+  "Preterm Labour", "Multiple Pregnancy", "Intrauterine Growth Restriction",
+  "Post Term Pregnancy", "HyperMesis Gravidarum", "PCOS", "Endometriosis",
+  "Uterine Fibroids", "Adenomyosis", "Ovarian Cyst", "Menstrual Disorder",
+  "Amenorrhea", "Dysmenorrhea", "Abnormal Uterine Bleeding",
+  "Pelvic Inflammatory Disease", "Vaginitis", "Cervicitis", "Infertility",
+  "Menopausal Symptoms", "None",
 ];
 
 const PREGNANCY_CONDITIONS = new Set([
-  "Normal Pregnancy",
-  "High Risk Pregnancy",
-  "Gestatational Diabetes",
-  "Gestatational Hypertension",
-  "Preeclamsia",
-  "Placenta Previa",
-  "Preterm Labour",
-  "Multiple Pregnancy",
-  "Intrauterine Growth Restriction",
-  "Post Term Pregnancy",
-  "HyperMesis Gravidarum",
+  "Normal Pregnancy", "High Risk Pregnancy", "Gestatational Diabetes",
+  "Gestatational Hypertension", "Preeclamsia", "Placenta Previa",
+  "Preterm Labour", "Multiple Pregnancy", "Intrauterine Growth Restriction",
+  "Post Term Pregnancy", "HyperMesis Gravidarum",
 ]);
 
 const PAGE_SIZE = 50;
@@ -64,6 +38,16 @@ function fmtDOB(str) {
   const [y, m, d] = str.split("-");
   if (!y || !m || !d) return str;
   return `${d}/${m}/${y}`;
+}
+
+// Parse DD-MM-YY or DD-MM-YYYY → timestamp for sorting
+function visitDateTs(str) {
+  if (!str) return 0;
+  const parts = str.split("-");
+  if (parts.length < 3) return 0;
+  const [d, m, y] = parts;
+  const year = y.length <= 2 ? 2000 + parseInt(y, 10) : parseInt(y, 10);
+  return new Date(year, parseInt(m, 10) - 1, parseInt(d, 10)).getTime();
 }
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
@@ -122,23 +106,19 @@ function PatientForm({ title, initial, isEdit, idIsGenerated, patients, onSave, 
   const [serverError, setServerError] = useState(null);
 
   const set = (key, val) => {
-    setForm((p)   => ({ ...p,   [key]: val }));
-    setErrors((p) => ({ ...p,   [key]: ""  }));
+    setForm((p) => ({ ...p, [key]: val }));
+    setErrors((p) => ({ ...p, [key]: "" }));
   };
 
   const validate = () => {
     const e = {};
-    // ID: only validate when the user types one manually (not auto-generated, not editing)
     if (!isEdit && !idIsGenerated && form.id.trim() !== "") {
-      if (!/^\d{6}$/.test(form.id.trim()))
-        e.id = "Must be exactly 6 digits.";
-      else if ((patients || []).some((p) => p.id === form.id.trim()))
-        e.id = "This ID already exists.";
+      if (!/^\d{6}$/.test(form.id.trim())) e.id = "Must be exactly 6 digits.";
+      else if (patients.some((p) => p.id === form.id.trim())) e.id = "This ID already exists.";
     }
-    if (!form.name.trim())    e.name      = "Name is required.";
-    if (!form.number.trim())  e.number    = "Contact number is required.";
-    else if (!/^\d{10}$/.test(form.number.trim()))
-                              e.number    = "Must be exactly 10 digits.";
+    if (!form.name.trim())   e.name   = "Name is required.";
+    if (!form.number.trim()) e.number = "Contact number is required.";
+    else if (!/^\d{10}$/.test(form.number.trim())) e.number = "Must be 10 digits.";
     if (form.is_active === "") e.is_active = "Please select a status.";
     return e;
   };
@@ -149,10 +129,7 @@ function PatientForm({ title, initial, isEdit, idIsGenerated, patients, onSave, 
     setSaving(true);
     setServerError(null);
     try {
-      await onSave({
-        ...form,
-        is_active: form.is_active === "true" || form.is_active === true,
-      });
+      await onSave({ ...form, is_active: form.is_active === "true" || form.is_active === true });
     } catch (err) {
       setServerError(err.message);
     } finally {
@@ -164,9 +141,7 @@ function PatientForm({ title, initial, isEdit, idIsGenerated, patients, onSave, 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md my-auto">
-
-        {/* Header */}
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <h2 className="text-base font-bold text-slate-800">{title}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition">
@@ -174,88 +149,66 @@ function PatientForm({ title, initial, isEdit, idIsGenerated, patients, onSave, 
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-4">
-
+        <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
           {serverError && (
-            <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-xs
-                            text-rose-700 font-medium">
+            <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-xs text-rose-700 font-medium">
               {serverError}
             </div>
           )}
 
-          {/* Patient ID */}
-          <Field
-            label="Patient ID"
-            error={errors.id}
-            hint={idIsGenerated
-              ? "(auto-generated by server)"
-              : !isEdit ? "(auto-generated if left blank)" : undefined}
-          >
+          <Field label="Patient ID" error={errors.id}
+            hint={idIsGenerated ? "(auto-generated)" : !isEdit ? "(auto-generated if blank)" : undefined}>
             <div className="relative">
-              <input
-                type="text" inputMode="numeric" maxLength={6}
+              <input type="text" inputMode="numeric" maxLength={6}
                 value={form.id}
                 onChange={(e) => set("id", e.target.value.replace(/\D/g, "").slice(0, 6))}
                 placeholder={idLocked ? "" : "6-digit number"}
                 disabled={idLocked}
                 className={`w-full px-3 py-2 text-sm border rounded-xl transition
                   focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent
-                  ${idLocked
-                    ? "bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed font-mono"
-                    : errors.id
-                      ? "border-rose-300 bg-rose-50 text-slate-700"
-                      : "border-slate-200 bg-white text-slate-700"}`}
+                  ${idLocked ? "bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed font-mono"
+                    : errors.id ? "border-rose-300 bg-rose-50 text-slate-700"
+                    : "border-slate-200 bg-white text-slate-700"}`}
               />
               {idIsGenerated && (
-                <span className="absolute right-3 top-1/2 -translate-y-1/2
-                                 text-[10px] font-bold bg-teal-100 text-teal-700
-                                 px-2 py-0.5 rounded-full">
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold
+                                 bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">
                   Generated
                 </span>
               )}
             </div>
           </Field>
 
-          {/* Name + Contact */}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Name" required error={errors.name}>
-              <input type="text" value={form.name}
-                onChange={(e) => set("name", e.target.value)}
+              <input type="text" value={form.name} onChange={(e) => set("name", e.target.value)}
                 placeholder="Full name"
                 className={`w-full px-3 py-2 text-sm border rounded-xl transition
                   focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent
-                  ${errors.name
-                    ? "border-rose-300 bg-rose-50"
-                    : "border-slate-200 bg-white text-slate-700"}`}
+                  ${errors.name ? "border-rose-300 bg-rose-50" : "border-slate-200 bg-white text-slate-700"}`}
               />
             </Field>
             <Field label="Contact Number" required error={errors.number}>
-              <input type="tel" value={form.number}
+              <input type="tel" value={form.number} inputMode="numeric"
                 onChange={(e) => set("number", e.target.value.replace(/\D/g, "").slice(0, 10))}
-                placeholder="10-digit number" inputMode="numeric"
+                placeholder="10-digit number"
                 className={`w-full px-3 py-2 text-sm border rounded-xl transition
                   focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent
-                  ${errors.number
-                    ? "border-rose-300 bg-rose-50"
-                    : "border-slate-200 bg-white text-slate-700"}`}
+                  ${errors.number ? "border-rose-300 bg-rose-50" : "border-slate-200 bg-white text-slate-700"}`}
               />
             </Field>
           </div>
 
-          {/* Date of Birth + Active Status */}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Date of Birth" hint="(optional)">
-              <input type="date" value={form.dob}
-                onChange={(e) => set("dob", e.target.value)}
-                max={new Date().toISOString().split("T")[0]}
+            <Field label="Date of Birth (YYYY-MM-DD)">
+              <input type="date" value={form.dob} onChange={(e) => set("dob", e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white
                            text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400
                            focus:border-transparent transition"
               />
             </Field>
             <Field label="Active Status" required error={errors.is_active}>
-              <select value={form.is_active}
-                onChange={(e) => set("is_active", e.target.value)}
+              <select value={form.is_active} onChange={(e) => set("is_active", e.target.value)}
                 className={`w-full px-3 py-2 text-sm border rounded-xl bg-white text-slate-700
                   focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition
                   ${errors.is_active ? "border-rose-300 bg-rose-50" : "border-slate-200"}`}>
@@ -266,22 +219,17 @@ function PatientForm({ title, initial, isEdit, idIsGenerated, patients, onSave, 
             </Field>
           </div>
 
-          {/* Condition */}
-          <Field label="Condition" hint="(optional)">
-            <select value={form.condition}
-              onChange={(e) => set("condition", e.target.value)}
+          <Field label="Condition">
+            <select value={form.condition} onChange={(e) => set("condition", e.target.value)}
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white
                          text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400
                          focus:border-transparent transition">
               <option value="">Select condition…</option>
-              {CONDITIONS.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+              {CONDITIONS.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </Field>
         </div>
 
-        {/* Footer */}
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
           <button onClick={onClose} disabled={saving}
             className="px-4 py-2 text-sm font-semibold text-slate-600 border border-slate-200
@@ -301,6 +249,129 @@ function PatientForm({ title, initial, isEdit, idIsGenerated, patients, onSave, 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  Visit History — used inside ViewDetailsModal
+// ─────────────────────────────────────────────────────────────────────────────
+
+// A single row label + value inside the expanded visit card
+function VRow({ label, value }) {
+  if (!value && value !== 0) return null;
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-start gap-0.5 sm:gap-3">
+      <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide sm:w-32 flex-shrink-0">
+        {label}
+      </span>
+      <span className="text-sm text-slate-800 whitespace-pre-wrap">{value}</span>
+    </div>
+  );
+}
+
+// One visit entry — collapsed shows date + pending badge, expanded shows full details
+function VisitCard({ visit }) {
+  const [open, setOpen] = useState(false);
+  const hasPending = visit.fees_pending > 0;
+
+  return (
+    <div className={`border rounded-xl overflow-hidden
+      ${hasPending ? "border-amber-200" : "border-slate-200"}`}>
+
+      {/* ── Clickable header ── */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`w-full flex items-center justify-between px-4 py-3 text-left
+          transition-colors hover:bg-slate-50
+          ${open ? "bg-slate-50" : "bg-white"}`}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-sm font-semibold text-slate-800 truncate">
+            {visit.visit_date || "—"}
+          </span>
+          <span className="text-xs text-slate-400 font-mono">#{visit.visit_id}</span>
+          {hasPending && (
+            <span className="flex-shrink-0 text-[11px] font-bold bg-amber-100 text-amber-700
+                             px-2 py-0.5 rounded-full">
+              ₹{visit.fees_pending} pending
+            </span>
+          )}
+          {visit.follow_up_date && (
+            <span className="flex-shrink-0 text-[11px] font-medium bg-indigo-50 text-indigo-600
+                             px-2 py-0.5 rounded-full">
+              Follow-up: {visit.follow_up_date}
+            </span>
+          )}
+        </div>
+        <ChevronDown
+          size={15}
+          className={`text-slate-400 flex-shrink-0 ml-2 transition-transform duration-200
+            ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {/* ── Expanded details ── */}
+      {open && (
+        <div className="px-4 py-4 border-t border-slate-100 bg-slate-50/60 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white border border-slate-200 rounded-lg px-3 py-2">
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Fees Paid</p>
+              <p className="text-base font-bold text-slate-800 mt-0.5">
+                {visit.fees_paid != null ? `₹${visit.fees_paid.toFixed(2)}` : "—"}
+              </p>
+            </div>
+            <div className={`border rounded-lg px-3 py-2
+              ${hasPending ? "bg-amber-50 border-amber-200" : "bg-white border-slate-200"}`}>
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Fees Pending</p>
+              <p className={`text-base font-bold mt-0.5
+                ${hasPending ? "text-amber-700" : "text-slate-800"}`}>
+                {visit.fees_pending != null ? `₹${visit.fees_pending.toFixed(2)}` : "—"}
+              </p>
+            </div>
+          </div>
+          <VRow label="Diagnosis"    value={visit.diagnosis} />
+          <VRow label="Prescription" value={visit.prescription} />
+          <VRow label="Notes"        value={visit.notes} />
+          <VRow label="Follow-up"    value={visit.follow_up_date || "None"} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Visits section rendered at the bottom of ViewDetailsModal
+function VisitsSection({ visits }) {
+  const sorted = [...(visits || [])].sort(
+    (a, b) => visitDateTs(b.visit_date) - visitDateTs(a.visit_date)
+  );
+
+  return (
+    <div className="mt-6">
+      {/* Section divider */}
+      <div className="flex items-center gap-2 mb-3">
+        <History size={15} className="text-indigo-500 flex-shrink-0" />
+        <h3 className="text-sm font-bold text-slate-700">
+          Visit History
+          <span className="ml-2 text-xs font-normal text-slate-400">
+            {sorted.length} {sorted.length === 1 ? "visit" : "visits"}
+          </span>
+        </h3>
+      </div>
+
+      {sorted.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed
+                        border-slate-200 rounded-xl text-slate-400">
+          <p className="text-sm">No visits recorded yet.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {sorted.map((v) => (
+            <VisitCard key={v.visit_id} visit={v} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  View Details Modal
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -308,13 +379,9 @@ function DetailRow({ label, value }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-start gap-1 py-2.5
                     border-b border-slate-100 last:border-0">
-      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide
-                       sm:w-40 flex-shrink-0 pt-0.5">
-        {label}
-      </span>
-      <span className="text-sm text-slate-800">
-        {value ?? <span className="text-slate-300 italic">—</span>}
-      </span>
+      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide
+                       sm:w-44 flex-shrink-0">{label}</span>
+      <span className="text-sm text-slate-800">{value ?? "—"}</span>
     </div>
   );
 }
@@ -326,7 +393,7 @@ function ViewDetailsModal({ patientId, onClose, onEdit, onDelete, fetchPatientDe
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting,      setDeleting]      = useState(false);
 
-  // Fetch on mount — useRef prevents double-fetch in React StrictMode
+  // useRef prevents double-fetch in React StrictMode
   const fetched = useRef(false);
   useEffect(() => {
     if (fetched.current) return;
@@ -352,7 +419,8 @@ function ViewDetailsModal({ patientId, onClose, onEdit, onDelete, fetchPatientDe
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md my-auto">
+      {/* ↓ max-w-2xl makes the modal wider; max-h-[80vh] gives more room for visits */}
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-auto">
 
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100">
@@ -364,14 +432,12 @@ function ViewDetailsModal({ patientId, onClose, onEdit, onDelete, fetchPatientDe
           <div className="flex items-center gap-2 flex-shrink-0 ml-4">
             {details && (
               <>
-                {/* Edit button */}
                 <button onClick={() => onEdit(details)}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold
                              bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-lg transition">
                   <Pencil size={12} /> Edit
                 </button>
 
-                {/* Delete button / inline confirm */}
                 {!confirmDelete ? (
                   <button onClick={() => setConfirmDelete(true)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold
@@ -395,43 +461,43 @@ function ViewDetailsModal({ patientId, onClose, onEdit, onDelete, fetchPatientDe
                 )}
               </>
             )}
-            <button onClick={onClose}
-              className="text-slate-400 hover:text-slate-600 transition ml-1">
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition ml-1">
               <X size={18} />
             </button>
           </div>
         </div>
 
         {/* Body */}
-        <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
+        <div className="px-6 py-4 max-h-[72vh] overflow-y-auto">
           {loadingDet ? (
             <div className="flex items-center gap-2 text-slate-400 py-10 justify-center">
               <Loader2 size={16} className="animate-spin" /> Loading details…
             </div>
           ) : fetchError ? (
-            <div className="bg-rose-50 border border-rose-100 rounded-xl px-4 py-3
-                            text-sm text-rose-600">
+            <div className="bg-rose-50 border border-rose-100 rounded-xl px-4 py-3 text-sm text-rose-600">
               {fetchError}
             </div>
           ) : details ? (
             <>
-              <DetailRow label="Patient ID"      value={md?.id} />
-              <DetailRow label="Name"            value={md?.name} />
-              <DetailRow label="Date of Birth"   value={fmtDOB(md?.dob)} />
-              <DetailRow label="Contact Number"  value={md?.number} />
-              <DetailRow label="Condition"       value={md?.condition || "—"} />
+              {/* ── Patient metadata ── */}
+              <DetailRow label="Patient ID"     value={md?.id} />
+              <DetailRow label="Name"           value={md?.name} />
+              <DetailRow label="Date of Birth"  value={fmtDOB(md?.dob)} />
+              <DetailRow label="Contact Number" value={md?.number} />
+              <DetailRow label="Condition"      value={md?.condition || "—"} />
               <DetailRow
                 label="Active Status"
                 value={
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full
                                     text-xs font-semibold
-                    ${md?.is_active
-                      ? "bg-green-100 text-green-700"
-                      : "bg-red-100 text-red-600"}`}>
+                    ${md?.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
                     {md?.is_active ? "Active" : "Inactive"}
                   </span>
                 }
               />
+
+              {/* ── Visit history ── */}
+              <VisitsSection visits={details.visits} />
             </>
           ) : (
             <p className="text-sm text-slate-400 py-8 text-center">
@@ -471,17 +537,12 @@ function SortButton({ sortKey, sortDir, currentKey, label, onClick }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Filter Dropdown
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Filter Dropdown ──────────────────────────────────────────────────────────
 
 function FilterDropdown({
-  filterActive,
-  setFilterActive,
-  filterCondition,
-  setFilterCondition,
-  filterAge,
-  setFilterAge,
+  filterActive, setFilterActive,
+  filterCondition, setFilterCondition,
+  filterAge, setFilterAge,
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -493,9 +554,9 @@ function FilterDropdown({
   }, []);
 
   const activeCount =
-    (filterActive !== null ? 1 : 0) +
+    (filterActive    !== null ? 1 : 0) +
     (filterCondition !== null ? 1 : 0) +
-    (filterAge !== null ? 1 : 0);
+    (filterAge       !== null ? 1 : 0);
 
   const clearAll = () => {
     setFilterActive(null);
@@ -534,12 +595,11 @@ function FilterDropdown({
             )}
           </div>
 
-          {/* Status */}
           <div>
             <p className="text-xs font-semibold text-slate-500 mb-1.5">Status</p>
             <div className="flex gap-2">
               {[[null, "All"], [true, "Active"], [false, "Inactive"]].map(([val, lbl]) => (
-                <button key={val} onClick={() => setFilterActive(val)}
+                <button key={String(val)} onClick={() => setFilterActive(val)}
                   className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition
                     ${filterActive === val
                       ? "bg-indigo-600 text-white border-indigo-600"
@@ -550,7 +610,6 @@ function FilterDropdown({
             </div>
           </div>
 
-          {/* Condition */}
           <div>
             <p className="text-xs font-semibold text-slate-500 mb-1.5">Condition</p>
             <select
@@ -558,27 +617,18 @@ function FilterDropdown({
               onChange={(e) => setFilterCondition(e.target.value || null)}
               className="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg bg-white
                          text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400
-                         focus:border-transparent transition"
-            >
+                         focus:border-transparent transition">
               <option value="">All conditions</option>
-              {CONDITIONS.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+              {CONDITIONS.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
 
-          {/* Age */}
           <div>
             <p className="text-xs font-semibold text-slate-500 mb-1.5">Age</p>
             <input
-              type="number"
-              min="0"
-              max="120"
+              type="number" min="0" max="120"
               value={filterAge ?? ""}
-              onChange={(e) => {
-                const value = e.target.value;
-                setFilterAge(value === "" ? null : Number(value));
-              }}
+              onChange={(e) => setFilterAge(e.target.value === "" ? null : Number(e.target.value))}
               placeholder="Any age"
               className="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg bg-white
                          text-slate-700 placeholder-slate-400 focus:outline-none
@@ -603,16 +653,16 @@ export default function Patients() {
     addPatient, updatePatient, deletePatient, fetchPatientDetails,
   } = useData();
 
-  const [query,            setQuery]            = useState("");
-  const [sortKey,          setSortKey]          = useState("name");
-  const [sortDir,          setSortDir]          = useState("asc");
+  const [query,           setQuery]           = useState("");
+  const [sortKey,         setSortKey]         = useState("name");
+  const [sortDir,         setSortDir]         = useState("asc");
   const [filterActive,    setFilterActive]    = useState(null);
   const [filterCondition, setFilterCondition] = useState(null);
   const [filterAge,       setFilterAge]       = useState(null);
   const [page,            setPage]            = useState(0);
-  const [modal,            setModal]            = useState(null);
-  const [idFetching,       setIdFetching]       = useState(false);
-  const [idFetchError,     setIdFetchError]     = useState(null);
+  const [modal,           setModal]           = useState(null);
+  const [idFetching,      setIdFetching]      = useState(false);
+  const [idFetchError,    setIdFetchError]    = useState(null);
 
   const handleSort = (key) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -620,39 +670,26 @@ export default function Patients() {
   };
 
   const activeFilterCount =
-    (filterActive !== null ? 1 : 0) +
+    (filterActive    !== null ? 1 : 0) +
     (filterCondition !== null ? 1 : 0) +
-    (filterAge !== null ? 1 : 0);
+    (filterAge       !== null ? 1 : 0);
 
   useEffect(() => {
     refreshPatients({
-      size: PAGE_SIZE,
-      offset: page * PAGE_SIZE,
+      size:      PAGE_SIZE,
+      offset:    page * PAGE_SIZE,
       condition: filterCondition,
-      active: filterActive,
-      age: filterAge,
+      active:    filterActive,
+      age:       filterAge,
     });
   }, [refreshPatients, page, filterCondition, filterActive, filterAge]);
 
-  const updateFilterActive = (value) => {
-    setFilterActive(value);
-    setPage(0);
-  };
+  const updateFilterActive    = (v) => { setFilterActive(v);    setPage(0); };
+  const updateFilterCondition = (v) => { setFilterCondition(v); setPage(0); };
+  const updateFilterAge       = (v) => { setFilterAge(v);       setPage(0); };
 
-  const updateFilterCondition = (value) => {
-    setFilterCondition(value);
-    setPage(0);
-  };
-
-  const updateFilterAge = (value) => {
-    setFilterAge(value);
-    setPage(0);
-  };
-
-  // ── Filtered + sorted list ──────────────────────────────────────────────────
   const displayed = useMemo(() => {
     let list = [...(patients || [])];
-
     if (query.trim()) {
       const q = query.toLowerCase();
       list = list.filter((p) =>
@@ -661,7 +698,6 @@ export default function Patients() {
         (p.number || "").includes(q)
       );
     }
-
     list.sort((a, b) => {
       let av, bv;
       if (sortKey === "name") { av = a.name.toLowerCase();    bv = b.name.toLowerCase(); }
@@ -671,16 +707,14 @@ export default function Patients() {
       if (av > bv) return sortDir === "asc" ?  1 : -1;
       return 0;
     });
-
     return list;
   }, [patients, query, sortKey, sortDir]);
 
-  // ── Open Add modal: fetch a generated ID from backend first ────────────────
   const openAddModal = async () => {
     setIdFetching(true);
     setIdFetchError(null);
     try {
-      const generatedId = await generatePatientId(); // GET /patient/id
+      const generatedId = await generatePatientId();
       setModal({ type: "add", generatedId });
     } catch (err) {
       setIdFetchError("Could not generate a Patient ID. Try again.");
@@ -690,12 +724,10 @@ export default function Patients() {
     }
   };
 
-  // ── CRUD handlers ───────────────────────────────────────────────────────────
-  const handleAdd    = async (fd) => { await addPatient(fd);     setModal(null); };
-  const handleEdit   = async (fd) => { await updatePatient(fd);  setModal(null); };
-  const handleDelete = async (id) => { await deletePatient(id);  setModal(null); };
+  const handleAdd    = async (fd) => { await addPatient(fd);    setModal(null); };
+  const handleEdit   = async (fd) => { await updatePatient(fd); setModal(null); };
+  const handleDelete = async (id) => { await deletePatient(id); setModal(null); };
 
-  // Map full patient details → form initial values for editing
   const openEdit = (details) => {
     const md = details.metadata;
     setModal({
@@ -703,15 +735,14 @@ export default function Patients() {
       initial: {
         id:        md.id,
         name:      md.name,
-        dob:       md.dob        || "",
+        dob:       md.dob       || "",
         number:    md.number,
-        condition: md.condition  || "",
+        condition: md.condition || "",
         is_active: String(md.is_active),
       },
     });
   };
 
-  // ── Loading splash ──────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex items-center gap-3 text-slate-400 py-16 justify-center">
@@ -728,7 +759,6 @@ export default function Patients() {
         <p className="mt-1 text-slate-500">Manage all registered patients.</p>
       </div>
 
-      {/* Backend error */}
       {error && (
         <div className="mb-4 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-sm text-rose-700">
           <p className="font-semibold">Backend connection error</p>
@@ -736,7 +766,6 @@ export default function Patients() {
         </div>
       )}
 
-      {/* ID fetch error */}
       {idFetchError && (
         <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm
                         text-amber-700 flex items-start gap-2">
@@ -745,11 +774,9 @@ export default function Patients() {
         </div>
       )}
 
-      {/* ── Toolbar ── */}
+      {/* Toolbar */}
       <div className="flex flex-col gap-3 mb-5">
         <div className="flex flex-wrap items-center gap-3">
-
-          {/* Search */}
           <div className="relative flex-1 min-w-[200px]">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input type="text" placeholder="Search by name, ID or number…"
@@ -760,24 +787,21 @@ export default function Patients() {
                          focus:border-transparent transition" />
           </div>
 
-          {/* Sort */}
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-xs text-slate-400 font-semibold flex items-center gap-1">
               <ArrowUpDown size={12} /> Sort:
             </span>
-            <SortButton sortKey="name" currentKey={sortKey} sortDir={sortDir} label="Name"       onClick={handleSort} />
-            <SortButton sortKey="id"   currentKey={sortKey} sortDir={sortDir} label="Patient ID" onClick={handleSort} />
+            <SortButton sortKey="name" currentKey={sortKey} sortDir={sortDir} label="Name"          onClick={handleSort} />
+            <SortButton sortKey="id"   currentKey={sortKey} sortDir={sortDir} label="Patient ID"    onClick={handleSort} />
             <SortButton sortKey="dob"  currentKey={sortKey} sortDir={sortDir} label="Date of Birth" onClick={handleSort} />
           </div>
 
-          {/* Filter */}
           <FilterDropdown
             filterActive={filterActive}       setFilterActive={updateFilterActive}
             filterCondition={filterCondition} setFilterCondition={updateFilterCondition}
             filterAge={filterAge}             setFilterAge={updateFilterAge}
           />
 
-          {/* Add Patient */}
           <button onClick={openAddModal} disabled={idFetching}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700
                        disabled:bg-indigo-400 text-white text-sm font-semibold px-4 py-2.5
@@ -788,38 +812,40 @@ export default function Patients() {
           </button>
         </div>
 
-        {/* Active filter chips */}
         {activeFilterCount > 0 && (
           <div className="flex flex-wrap gap-2">
             {filterActive !== null && (
               <span className="flex items-center gap-1.5 bg-green-50 text-green-700
                                text-xs font-semibold px-2.5 py-1 rounded-full">
                 {filterActive ? "Active only" : "Inactive only"}
-                <button onClick={() => updateFilterActive(null)}
-                  className="hover:text-green-900"><X size={11} /></button>
+                <button onClick={() => updateFilterActive(null)} className="hover:text-green-900">
+                  <X size={11} />
+                </button>
               </span>
             )}
             {filterCondition !== null && (
               <span className="flex items-center gap-1.5 bg-rose-50 text-rose-700
                                text-xs font-semibold px-2.5 py-1 rounded-full">
                 Condition: {filterCondition}
-                <button onClick={() => updateFilterCondition(null)}
-                  className="hover:text-rose-900"><X size={11} /></button>
+                <button onClick={() => updateFilterCondition(null)} className="hover:text-rose-900">
+                  <X size={11} />
+                </button>
               </span>
             )}
             {filterAge !== null && (
               <span className="flex items-center gap-1.5 bg-sky-50 text-sky-700
                                text-xs font-semibold px-2.5 py-1 rounded-full">
                 Age: {filterAge}
-                <button onClick={() => updateFilterAge(null)}
-                  className="hover:text-sky-900"><X size={11} /></button>
+                <button onClick={() => updateFilterAge(null)} className="hover:text-sky-900">
+                  <X size={11} />
+                </button>
               </span>
             )}
           </div>
         )}
       </div>
 
-      {/* ── Table ── */}
+      {/* Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
@@ -869,56 +895,39 @@ export default function Patients() {
             </tbody>
           </table>
         </div>
+
         <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 text-xs text-slate-500
                         flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <span>
-            Page {page + 1} · Showing {displayed.length} of up to {PAGE_SIZE} patients
-          </span>
+          <span>Page {page + 1} · Showing {displayed.length} of up to {PAGE_SIZE} patients</span>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
+            <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}
               className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600
                          font-semibold hover:border-indigo-300 disabled:opacity-50
-                         disabled:cursor-not-allowed transition"
-            >
+                         disabled:cursor-not-allowed transition">
               Previous
             </button>
-            <button
-              onClick={() => setPage((p) => p + 1)}
+            <button onClick={() => setPage((p) => p + 1)}
               disabled={(patients || []).length < PAGE_SIZE}
               className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600
                          font-semibold hover:border-indigo-300 disabled:opacity-50
-                         disabled:cursor-not-allowed transition"
-            >
+                         disabled:cursor-not-allowed transition">
               Next
             </button>
           </div>
         </div>
       </div>
 
-      {/* ── Modals ── */}
+      {/* Modals */}
       {modal?.type === "add" && (
-        <PatientForm
-          title="Add New Patient"
+        <PatientForm title="Add New Patient"
           initial={{ ...EMPTY_FORM, id: modal.generatedId || "" }}
-          isEdit={false}
-          idIsGenerated={!!modal.generatedId}
-          patients={patients || []}
-          onSave={handleAdd}
-          onClose={() => setModal(null)}
-        />
+          isEdit={false} idIsGenerated={!!modal.generatedId}
+          patients={patients || []} onSave={handleAdd} onClose={() => setModal(null)} />
       )}
       {modal?.type === "edit" && (
-        <PatientForm
-          title="Edit Patient"
-          initial={modal.initial}
-          isEdit={true}
-          idIsGenerated={false}
-          patients={patients || []}
-          onSave={handleEdit}
-          onClose={() => setModal(null)}
-        />
+        <PatientForm title="Edit Patient" initial={modal.initial}
+          isEdit={true} idIsGenerated={false}
+          patients={patients || []} onSave={handleEdit} onClose={() => setModal(null)} />
       )}
       {modal?.type === "view" && (
         <ViewDetailsModal

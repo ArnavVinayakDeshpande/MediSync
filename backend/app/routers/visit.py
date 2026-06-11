@@ -28,7 +28,8 @@ def create(data: dict = Body(...)):
 
     try:
         created_id = vm.visit_manager.create(
-                visit_from_json_fmt(data)
+                patient_id = data["patient_id"],
+                visit = visit_from_json_fmt(data)
                 )
 
         return {

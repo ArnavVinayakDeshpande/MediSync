@@ -18,7 +18,7 @@ def date_to_json_fmt(dt: date | None) -> str | None:
     return dt.strftime("%d-%m-%Y") if dt else None
 
 def date_from_json_fmt(dt: str | None) -> date | None:
-    return datetime.strptime(dt, "%d-%m-%Y") if dt else None
+    return datetime.strptime(dt, "%d-%m-%Y").date() if dt else None
 
 def condition_object_to_str(condition: MedicalCondition) -> str:
     return condition.replace("_", " ").title() if condition != MedicalCondition.PCOS else "PCOS"
@@ -52,7 +52,7 @@ def visit_to_json_fmt(visit: Visit) -> dict:
             "date": date_to_json_fmt(visit.date),
             "diagnosis": visit.diagnosis,
             "prescription": visit.prescription,
-            "notes": visits.notes,
+            "notes": visit.notes,
             "fees_paid": visit.fees_paid,
             "fees_pending": visit.fees_pending,
             "follow_up_date": date_to_json_fmt(visit.follow_up_date)

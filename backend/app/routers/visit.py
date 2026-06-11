@@ -111,7 +111,14 @@ def getid():
                 detail = "Visit Manager has not been initialized."
                 )
 
-    return vm.visit_manager.create_id()
+    try:
+        return vm.visit_manager.create_id()
+
+    except VMDatabaseError as exc:
+        raise HTTPException(
+                status_code = 500,
+                detail = str(exc)
+                ) from exc
 
 @router.get("/{visit_id}")
 def get(visit_id: str):

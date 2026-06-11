@@ -4,9 +4,10 @@
 import sqlite3 as sql3
 from pathlib import Path
 
-from .exceptions import *
-from .patient_repo import PatientRepository
-from .visit_repo import VisitRepository 
+from app.database.exceptions import *
+from app.database.patient_repo import PatientRepository
+from app.database.visit_repo import VisitRepository 
+from app.database.wa_msg_history_repo import WhatsAppMsgHistoryRepository
 
 
 class Database:
@@ -16,6 +17,7 @@ class Database:
         self.connection = None
         self.patient_repo = None
         self.visit_repo = None
+        self.wa_msg_history_repo = None
 
         try:
             self.connection = sql3.connect(
@@ -35,6 +37,7 @@ class Database:
             try:
                 self.patient_repo = PatientRepository(self.connection)
                 self.visit_repo = VisitRepository(self.connection)
+                self.wa_msg_history_repo = WhatsAppMsgHistoryRepository(self.conection)
 
             except sql3.Error as exc:
                 self.connection.close()

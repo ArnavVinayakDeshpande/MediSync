@@ -32,12 +32,29 @@ const PAGE_SIZE = 50;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// YYYY-MM-DD → DD/MM/YYYY
+// Backend returns DD-MM-YYYY; display as DD/MM/YYYY
 function fmtDOB(str) {
-  if (!str || str === "") return "—";
-  const [y, m, d] = str.split("-");
-  if (!y || !m || !d) return str;
-  return `${d}/${m}/${y}`;
+  if (!str) return "—";
+  return str.replace(/-/g, "/");  // "15-07-2025" → "15/07/2025"
+}
+
+// <input type="date"> value (YYYY-MM-DD) → backend format (DD-MM-YYYY)
+function toDDMMYYYY(isoDate) {
+  if (!isoDate) return "";
+  const parts = isoDate.split("-");
+  if (parts.length !== 3) return isoDate;
+  const [y, m, d] = parts;
+  return `${d}-${m}-${y}`;
+}
+
+// Backend format (DD-MM-YYYY) → <input type="date"> value (YYYY-MM-DD)
+function toYYYYMMDD(backendDate) {
+  if (!backendDate) return "";
+  const parts = backendDate.split("-");
+  if (parts.length !== 3) return "";
+  const [d, m, y] = parts;
+  const fullYear = y.length === 2 ? `20${y}` : y;
+  return `${fullYear}-${m}-${d}`;
 }
 
 // Parse DD-MM-YY or DD-MM-YYYY → timestamp for sorting
@@ -129,7 +146,12 @@ function PatientForm({ title, initial, isEdit, idIsGenerated, patients, onSave, 
     setSaving(true);
     setServerError(null);
     try {
-      await onSave({ ...form, is_active: form.is_active === "true" || form.is_active === true });
+      await onSave({
+        ...form,
+        // Convert YYYY-MM-DD (date input) → DD-MM-YYYY expected by patient_from_json_fmt
+        dob: toDDMMYYYY(form.dob),
+        is_active: form.is_active === "true" || form.is_active === true,
+      });
     } catch (err) {
       setServerError(err.message);
     } finally {
@@ -200,7 +222,7 @@ function PatientForm({ title, initial, isEdit, idIsGenerated, patients, onSave, 
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Date of Birth (YYYY-MM-DD)">
+            <Field label="Date of Birth">
               <input type="date" value={form.dob} onChange={(e) => set("dob", e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white
                            text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400
@@ -702,7 +724,7 @@ export default function Patients() {
       let av, bv;
       if (sortKey === "name") { av = a.name.toLowerCase();    bv = b.name.toLowerCase(); }
       if (sortKey === "id")   { av = parseInt(a.id, 10) || 0; bv = parseInt(b.id, 10) || 0; }
-      if (sortKey === "dob")  { av = a.dob  || "0000";        bv = b.dob  || "0000"; }
+      if (sortKey === "dob")  { av = visitDateTs(a.dob);      bv = visitDateTs(b.dob); }
       if (av < bv) return sortDir === "asc" ? -1 :  1;
       if (av > bv) return sortDir === "asc" ?  1 : -1;
       return 0;
@@ -735,7 +757,8 @@ export default function Patients() {
       initial: {
         id:        md.id,
         name:      md.name,
-        dob:       md.dob       || "",
+        // Convert DD-MM-YYYY (backend) → YYYY-MM-DD so the date input pre-fills
+        dob:       toYYYYMMDD(md.dob),
         number:    md.number,
         condition: md.condition || "",
         is_active: String(md.is_active),

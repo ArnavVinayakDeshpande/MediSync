@@ -37,7 +37,7 @@ class Database:
             try:
                 self.patient_repo = PatientRepository(self.connection)
                 self.visit_repo = VisitRepository(self.connection)
-                self.wa_msg_history_repo = WhatsAppMsgHistoryRepository(self.conection)
+                self.wa_msg_history_repo = WhatsAppMsgHistoryRepository(self.connection)
 
             except sql3.Error as exc:
                 self.connection.close()

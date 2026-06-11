@@ -5,3 +5,6 @@ __pycache__/
 # Neovim
 .vim/
 *.xlsx
+
+# Data
+data/

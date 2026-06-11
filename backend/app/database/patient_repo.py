@@ -3,7 +3,7 @@
 
 import sqlite3 as sql3
 
-from app.database..exceptions import *
+from app.database.exceptions import *
 from app.models.patient import Patient
 from app.models.medical_condition import MedicalCondition
 from app.common.converter import *

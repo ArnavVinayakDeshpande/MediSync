@@ -29,9 +29,9 @@ class WhatsAppTemplateLanguage(StrEnum):
     SPANISH = "es"
 
 class WhatsAppTemplateCategory(StrEnum):
-    MARKETING = auto()
-    UTILITY = auto()
-    AUTHENTICATION = auto()
+    MARKETING = "MARKETING"
+    UTILITY = "UTILITY"
+    AUTHENTICATION = "AUTHENTICATION"
 
 class WhatsAppTemplateApprovalStatus(StrEnum):
     PENDING = auto()

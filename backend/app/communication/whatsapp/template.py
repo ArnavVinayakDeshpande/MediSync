@@ -34,14 +34,14 @@ class WhatsAppTemplateCategory(StrEnum):
     AUTHENTICATION = "AUTHENTICATION"
 
 class WhatsAppTemplateApprovalStatus(StrEnum):
-    PENDING = auto()
-    APPROVED = auto()
-    REJECTED = auto()
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
 
 class WhatsAppTemplateStatus(StrEnum):
-    ACTIVE = auto()
-    PAUSED = auto()
-    DISABLED = auto()
+    ACTIVE = "ACTIVE"
+    PAUSED = "PAUSED"
+    DISABLED = "DISABLED"
 
 @dataclass
 class WhatsAppTemplate:

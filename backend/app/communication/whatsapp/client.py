@@ -9,18 +9,23 @@ from app.communication.whatsapp.exceptions import *
 
 class WhatsAppClient:
     def __init__(
-            self,
-            access_token: str,
-            phone_number_id: str,
-            business_account_id: str,
-            api_version: str = "v23.0"):
+        self,
+        access_token: str,
+        phone_number_id: str,
+        business_account_id: str,
+        api_version: str = "v23.0"
+    ):
         self._access_token = access_token
         self._phone_number_id = phone_number_id
         self._business_account_id = business_account_id
         self._api_version = api_version
 
-    def _build_url(self, endpoint: str) -> str:
-        return self.api_base_url + "/" + endpoint
+    def _build_url(self, endpoint: str : None) -> str:
+        return (
+            f"""
+                {self.api_base_url}/{self._business_account_id}/{endpoint}
+            """
+        ) if endpoint else self.api_base_url
 
     @property
     def headers(self) -> dict[str, str]:
@@ -31,7 +36,11 @@ class WhatsAppClient:
 
     @property
     def api_base_url(self) -> str:
-        return f"https://graph.facebook.com/{self._api_version}"
+        return (
+            f"""
+                https://graph.facebook.com/{self._api_version}
+            """
+        )
 
     @property
     def phone_number_id(self) -> str:
@@ -54,10 +63,10 @@ class WhatsAppClient:
         return f"{self._business_account_id}/message_templates"
 
     def _send(
-            self,
-            method,
-            **kwargs
-            ) -> requests.Response:
+        self,
+        method,
+        **kwargs
+    ) -> requests.Response:
         try:
             response = method(timeout = 30, **kwargs)
             response.raise_for_status()
@@ -67,50 +76,50 @@ class WhatsAppClient:
             raise WhatsAppAPIError(exc) from exc
 
     def get(
-            self,
-            endpoint: str,
-            params: dict | None = None
-        ) -> requests.Response:
+        self,
+        endpoint: str | None,
+        params: dict | None = None
+    ) -> requests.Response:
         return self._send(
                 requests.get,
                 url = self._build_url(endpoint),
                 headers = self.headers,
                 params = params
-                )
+        )
 
     def post(
-            self,
-            endpoint: str,
-            body: dict
-        ) -> requests.Response:
+        self,
+        endpoint: str | None,
+        body: dict
+    ) -> requests.Response:
         return self._send(
                 requests.post,
                 url = self._build_url(endpoint),
                 headers = self.headers,
                 json = body
-                )
+        )
 
     def put(
-            self,
-            endpoint: str,
-            body: dict
-            ) -> requests.Response:
+        self,
+        endpoint: str | None,
+        body: dict
+    ) -> requests.Response:
         return self._send(
                 requests.put,
                 url = self._build_url(endpoint),
                 headers = self.headers,
                 json = body
-                )
+        )
 
     def delete(
-            self,
-            endpoint: str,
-            params: dict | None = None
-            ) -> requests.Response:
+        self,
+        endpoint: str | None,
+        params: dict | None = None
+    ) -> requests.Response:
         return self._send(
                 requests.delete,
                 url = self._build_url(endpoint),
                 headers = self.headers,
                 params = params
-                )
+        )
 

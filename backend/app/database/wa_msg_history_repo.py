@@ -17,7 +17,7 @@ class WhatsAppMsgHistoryRepository:
 
         self._ensure_initialized()
 
-    def _get_cursor(self):
+    def _get_cursor(self) -> sql3.Cursor:
         try:
             return self.connection.cursor()
 
@@ -29,7 +29,7 @@ class WhatsAppMsgHistoryRepository:
 
         try:
             cursor.execute(
-                    """
+                """
                     CREATE TABLE IF NOT EXISTS
                         wa_message_history (
                             id TEXT PRIMARY KEY NOT NULL,
@@ -45,8 +45,8 @@ class WhatsAppMsgHistoryRepository:
                             read_on TEXT,
                             created_on TEXT NOT NULL,
                             parameters TEXT NOT NULL
-                            )
-                    """
+                        )
+                """
                     )
 
             self.commit()
@@ -76,7 +76,7 @@ class WhatsAppMsgHistoryRepository:
                     )
 
         except Exception as exc:
-            raise DatabaseParsingError() from exc
+            raise DatabaseParsingError(exc) from exc
 
     def insert(
             self,

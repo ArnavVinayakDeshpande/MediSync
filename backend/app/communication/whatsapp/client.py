@@ -20,19 +20,15 @@ class WhatsAppClient:
         self._business_account_id = business_account_id
         self._api_version = api_version
 
-    def _build_url(self, endpoint: str : None) -> str:
-        return (
-            f"""
-                {self.api_base_url}/{self._business_account_id}/{endpoint}
-            """
-        ) if endpoint else self.api_base_url
+    def _build_url(self, endpoint: str) -> str:
+        return f"{self.api_base_url}/{endpoint}"
 
     @property
     def headers(self) -> dict[str, str]:
         return {
                 "Authorization": f"Bearer {self._access_token}",
                 "Content-Type": "application/json"
-                }
+        }
 
     @property
     def api_base_url(self) -> str:
@@ -56,11 +52,14 @@ class WhatsAppClient:
 
     @property
     def api_message_endpoint(self) -> str:
-        return f"{self._phone_number_id}/messages"
+        return f"{self._business_account_id}/{self._phone_number_id}/messages"
 
     @property
-    def api_template_endpoint(self) -> str:
-        return f"{self._business_account_id}/message_templates"
+    def api_template_endpoint(
+        self,
+        template_id: str | None
+    ) -> str:
+        return f"{template_id}" if template_id else f"{self._business_account_id}/message_templates"
 
     def _send(
         self,
@@ -77,7 +76,7 @@ class WhatsAppClient:
 
     def get(
         self,
-        endpoint: str | None,
+        endpoint: str,
         params: dict | None = None
     ) -> requests.Response:
         return self._send(
@@ -89,7 +88,7 @@ class WhatsAppClient:
 
     def post(
         self,
-        endpoint: str | None,
+        endpoint: str,
         body: dict
     ) -> requests.Response:
         return self._send(
@@ -113,7 +112,7 @@ class WhatsAppClient:
 
     def delete(
         self,
-        endpoint: str | None,
+        endpoint: str,
         params: dict | None = None
     ) -> requests.Response:
         return self._send(

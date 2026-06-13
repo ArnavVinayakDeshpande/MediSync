@@ -8,6 +8,7 @@ from app.database.exceptions import *
 from app.database.patient_repo import PatientRepository
 from app.database.visit_repo import VisitRepository 
 from app.database.wa_msg_history_repo import WhatsAppMsgHistoryRepository
+from app.database.wa_template_repo import WhatsAppTemplateRepository
 
 
 class Database:
@@ -18,17 +19,18 @@ class Database:
         self.patient_repo = None
         self.visit_repo = None
         self.wa_msg_history_repo = None
+        self.wa_template_repo = None
 
         try:
             self.connection = sql3.connect(
-                    self.filepath,
-                    check_same_thread = False
-                    )
+                self.filepath,
+                check_same_thread = False
+            )
             self.connection.execute(
-                    """
+                """
                     PRAGMA foreign_keys = ON
-                    """
-                    )
+                """
+            )
 
         except sql3.Error as exc:
             raise DatabaseDisconnectedError(exc) from exc
@@ -38,6 +40,7 @@ class Database:
                 self.patient_repo = PatientRepository(self.connection)
                 self.visit_repo = VisitRepository(self.connection)
                 self.wa_msg_history_repo = WhatsAppMsgHistoryRepository(self.connection)
+                self.wa_template_repo = WhatsAppTemplateRepository(self.connection)
 
             except sql3.Error as exc:
                 self.connection.close()

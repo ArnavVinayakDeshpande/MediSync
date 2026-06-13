@@ -265,6 +265,7 @@ class WhatsAppTemplateRepository:
         set_footer: bool = False,
         set_status: bool = False,
         set_approved_on: bool = False,
+        set_approval_status: bool = False,
         header: str | None = None,
         footer: str | None = None,
         approval_status: WhatsAppTemplateApprovalStatus | None = None,
@@ -278,18 +279,60 @@ class WhatsAppTemplateRepository:
             not set_footer and
             not set_status and
             not set_approved_on and
-            not approval_status
+            not set_approval_status
         ):
-            return # No changes
+            return  # No changes
 
         query = "UPDATE wa_templates SET"
         parameters = []
 
-        if set_header:
-            query += " header = ?"
-
         try:
-            pass
+            first = True
+
+            if set_header:
+                if not first:
+                    query += ","
+                query += " header = ?"
+                parameters.append(header)
+                first = False
+
+            if set_footer:
+                if not first:
+                    query += ","
+                query += " footer = ?"
+                parameters.append(footer)
+                first = False
+
+            if set_status:
+                if not first:
+                    query += ","
+                query += " status = ?"
+                parameters.append(status.value if status is not None else None)
+                first = False
+
+            if set_approval_status:
+                if not first:
+                    query += ","
+                query += " approval_status = ?"
+                parameters.append(
+                    approval_status.value if approval_status is not None else None
+                )
+                first = False
+
+            if set_approved_on:
+                if not first:
+                    query += ","
+                query += " approved_on = ?"
+                parameters.append(date_to_db_fmt(approved_on))
+                first = False
+
+            query += " WHERE id = ?"
+            parameters.append(template_id)
+
+            cursor.execute(query, parameters)
+
+            if cursor.rowcount == 0:
+                raise DatabaseAbsentEntryError()
 
         except sql3.Error as exc:
             raise DatabaseExecutionError(exc) from exc

@@ -69,26 +69,27 @@ class PatientRepository:
 
         try:
             cursor.execute(
-                    """
-                    INSERT INTO patients (
-                        id, 
-                        name,
-                        dob,
-                        number,
-                        condition,
-                        is_active
+                """
+                    INSERT INTO 
+                        patients (
+                            id, 
+                            name,
+                            dob,
+                            number,
+                            condition,
+                            is_active
                         )
                     VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        patient.id,
-                        patient.name,
-                        date_to_db_fmt(patient.dob),
-                        patient.number,
-                        patient.condition,
-                        int(patient.is_active)
-                        )
-                    )
+                """,
+                (
+                    patient.id,
+                    patient.name,
+                    date_to_db_fmt(patient.dob),
+                    patient.number,
+                    patient.condition,
+                    int(patient.is_active)
+                )
+            )
 
         except sql3.IntegrityError:
             raise DatabaseDuplicateEntryError() 
@@ -104,11 +105,11 @@ class PatientRepository:
 
         try:
             cursor.execute(
-                    """
+                """
                     DELETE FROM patients WHERE id = ?
-                    """,
-                    (patient_id,)
-                    )
+                """,
+                (patient_id,)
+            )
 
             if cursor.rowcount == 0:
                 raise DatabaseAbsentEntryError()
@@ -124,10 +125,10 @@ class PatientRepository:
 
         try:
             cursor.execute(
-                    """
+                """
                     DELETE FROM patients
-                    """
-                    )
+                """
+            )
 
         except sql3.Error as exc:
             raise DatabaseExecutionError(exc) from exc
@@ -140,11 +141,11 @@ class PatientRepository:
 
         try:
             cursor.execute(
-                    """
+                """
                     SELECT * FROM patients WHERE id = ?
-                    """,
+                """,
                     (patient_id,)
-                    )
+            )
 
             data = cursor.fetchone()
 
@@ -157,13 +158,13 @@ class PatientRepository:
             cursor.close()
 
     def getall(
-            self,
-            size: int | None = None,
-            offset: int | None = None,
-            condition: MedicalCondition | None = None,
-            active: bool | None = None,
-            age: int | None = None # Implement later
-            ) -> list[Patient]:
+        self,
+        size: int | None = None,
+        offset: int | None = None,
+        condition: MedicalCondition | None = None,
+        active: bool | None = None,
+        age: int | None = None # Implement later
+    ) -> list[Patient]:
         cursor = self._get_cursor()
 
         query = "SELECT * FROM patients"
@@ -187,9 +188,9 @@ class PatientRepository:
             params.append(offset if offset is not None else 0)
 
             cursor.execute(
-                    query,
-                    params
-                    )
+                query,
+                params
+            )
 
             data = cursor.fetchall()
 
@@ -206,10 +207,10 @@ class PatientRepository:
 
         try:
             cursor.execute(
-                    """
+                """
                     SELECT id FROM patients
-                    """
-                    )
+                """
+            )
 
             return [row[0] for row in cursor.fetchall()]
 
@@ -221,7 +222,7 @@ class PatientRepository:
 
         try:
             cursor.execute(
-                    """
+                """
                     UPDATE patients
                     SET 
                         name = ?,
@@ -230,16 +231,16 @@ class PatientRepository:
                         condition = ?,
                         is_active = ?
                     WHERE id = ?
-                    """,
-                    (
-                        patient.name,
-                        date_to_db_fmt(patient.dob),
-                        patient.number,
-                        patient.condition,
-                        int(patient.is_active),
-                        patient.id
-                        )
-                    )
+                """,
+                (
+                    patient.name,
+                    date_to_db_fmt(patient.dob),
+                    patient.number,
+                    patient.condition,
+                    int(patient.is_active),
+                    patient.id
+                )
+            )
 
             if cursor.rowcount == 0:
                 raise DatabaseAbsentEntryError()
@@ -255,11 +256,11 @@ class PatientRepository:
 
         try:
             cursor.execute(
-                    """
+                """
                     SELECT name FROM patients WHERE id = ?
-                    """,
-                    (patient_id,)
-                    )
+                """,
+                (patient_id,)
+            )
 
             return cursor.fetchone() is not None
 

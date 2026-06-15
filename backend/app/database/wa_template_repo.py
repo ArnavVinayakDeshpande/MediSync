@@ -92,7 +92,7 @@ class WhatsAppTemplateRepository:
     ):
         template.validate()
 
-        cursor = self._get_cursor()o
+        cursor = self._get_cursor()
         
         try:
             cursor.execute(

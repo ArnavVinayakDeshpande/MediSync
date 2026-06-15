@@ -1,7 +1,7 @@
 """
 """
 
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 from app.models.patient import Patient
 from app.models.visit import Visit
@@ -69,4 +69,12 @@ def visit_from_json_fmt(data: dict) -> Visit:
             fees_pending = data["fees_pending"],
             follow_up_date = date_from_json_fmt(data["follow_up_date"])
             )
+
+def age_to_date_range(age: int) -> tuple[date, date]:
+    today = date.today()
+
+    youngest = today.replace(year = today.year - age)
+    oldest = today.replace(year = youngest.year - 1) + timedelta(days = 1)
+
+    return (youngest, oldest)
 

@@ -6,7 +6,11 @@ import sqlite3 as sql3
 from app.database.exceptions import *
 from app.models.patient import Patient
 from app.models.medical_condition import MedicalCondition
-from app.common.converter import *
+from app.common.converter import (
+    date_to_db_fmt,
+    date_from_db_fmt,
+    age_to_date_range
+)
 
 
 class PatientRepository:
@@ -27,7 +31,7 @@ class PatientRepository:
 
         try:
             cursor.execute(
-                    """
+            """
                     CREATE TABLE IF NOT EXISTS 
                            patients (
                                id TEXT PRIMARY KEY NOT NULL,
@@ -36,8 +40,9 @@ class PatientRepository:
                                number TEXT UNIQUE,
                                condition TEXT,
                                is_active INT
-                               )
-                    """)
+                           )
+                """
+            )
 
             self.commit()
 
@@ -47,19 +52,16 @@ class PatientRepository:
         finally:
             cursor.close()
 
-    def _create_patient(self, data: tuple | None) -> Patient | None:
-        if not data:
-            return None
-
+    def _create_patient(self, data: tuple) -> Patient:
         try:
             return Patient(
-                    id = data[0],
-                    name = data[1],
-                    dob = date_from_db_fmt(data[2]),
-                    number = data[3],
-                    condition = MedicalCondition(data[4]),
-                    is_active = data[5]
-                    )
+                id = data[0],
+                name = data[1],
+                dob = date_from_db_fmt(data[2]),
+                number = data[3],
+                condition = MedicalCondition(data[4]),
+                is_active = data[5]
+            )
 
         except Exception as exc:
             raise DatabaseParsingError() from exc
@@ -149,6 +151,9 @@ class PatientRepository:
 
             data = cursor.fetchone()
 
+            if data is None:
+                return None
+
             return self._create_patient(data)
 
         except sql3.Error as exc:
@@ -161,9 +166,10 @@ class PatientRepository:
         self,
         size: int | None = None,
         offset: int | None = None,
+        search: str | None = None,
         condition: MedicalCondition | None = None,
         active: bool | None = None,
-        age: int | None = None # Implement later
+        age: int | None = None
     ) -> list[Patient]:
         cursor = self._get_cursor()
 
@@ -174,11 +180,22 @@ class PatientRepository:
         try:
             if condition is not None:
                 filters.append("condition = ?")
-                params.append(condition)
+                params.append(condition.value)
 
             if active is not None:
                 filters.append("is_active = ?")
                 params.append(int(active))
+
+            if search is not None:
+                filters.append("name LIKE ?")
+                params.append(search + "%")
+
+            if age is not None:
+                date_range = age_to_date_range(age)
+                filters.append("dob >= ?")
+                filters.append("dob <= ?")
+                params.append(date_range[0])
+                params.append(date_range[1])
 
             if filters:
                 query += " WHERE " + " AND ".join(filters)

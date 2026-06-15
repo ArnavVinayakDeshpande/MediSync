@@ -202,7 +202,7 @@ class PatientRepository:
         finally:
             cursor.close()
 
-    def getids(self) -> list[str]:
+    def get_all_ids(self) -> list[str]:
         cursor = self._get_cursor()
 
         try:
@@ -216,6 +216,44 @@ class PatientRepository:
 
         except sql3.Error as exc:
             raise DatabaseExecutionError(exc) from exc
+
+    def get_name(self, patient_id: str) -> str | None:
+        cursor = self._get_cursor()
+
+        try:
+            cursor.execute(
+                """
+                    SELECT name FROM patients WHERE id = ?
+                """,
+                (patient_id,)
+            )
+
+            return cursor.fetchone()
+
+        except sql3.Error as exc:
+            raise DatabaseExecutionError(exc) from exc
+
+        finally:
+            cursor.close()
+
+    def get_id(self, patient_name: str) -> str | None:
+        cursor = self._get_cursor()
+
+        try:
+            cursor.execute(
+                """
+                    SELECT id FROM patients WHERE name = ?
+                """,
+                (patient_name,)
+            )
+
+            return cursor.fetchone()
+
+        except sql3.Error as exc:
+            raise DatabaseExecutionError(exc) from exc
+
+        finally:
+            cursor.close()
 
     def update(self, patient: Patient):
         cursor = self._get_cursor()

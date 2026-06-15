@@ -142,6 +142,33 @@ class PatientManager:
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
             raise PMDatabaseError(exc) from exc
 
+    def get_all_ids(self) -> list[str]:
+        self._validate()
+
+        try:
+            return self.repo.get_all_ids()
+
+        except (DatabaseCursorError, DatabaseExecutionError) as exc:
+            raise PMDatabaseError(exc) from exc
+
+    def get_name(self, patient_id: str) -> str | None:
+        self._validate()
+
+        try:
+            return self._repo.get_name(patient_id)
+
+        except (DatabaseCursorError, DatabaseExecutionError) as exc:
+            raise PMDatabaseError(exc) from exc
+
+    def get_id(self, patient_name: str) -> str | None:
+        self._validate()
+
+        try:
+            return self._repo.get_id(patient_name)
+
+        except (DatabaseCursorError, DatabaseExecutionError) as exc:
+            raise PMDatabaseError(exc) from exc
+
     def update(
             self,
             patient_id: str,

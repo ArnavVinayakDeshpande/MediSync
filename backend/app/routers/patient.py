@@ -14,7 +14,7 @@ from app.models.medical_condition import *
 from app.common.converter import *
 
 
-router = APIRouter(
+router: APIRouter = APIRouter(
             prefix = "/patients",
             tags = ["Patients"]
         )
@@ -109,7 +109,7 @@ def getid():
         ) from exc
 
 @router.get("/ids")
-def get_ids():
+def get_all_ids():
     if pm.patient_manager is None:
         raise HTTPException(
             status_code = 500,
@@ -117,7 +117,7 @@ def get_ids():
         )
 
     try:
-        return pm.patient_manager.get_ids()
+        return pm.patient_manager.get_all_ids()
 
     except PMDatabaseError as exc:
         raise HTTPException(
@@ -156,6 +156,7 @@ def get(patient_id: str):
 def getall(
     size: int | None = Query(default = None),
     offset: int | None = Query(default = None),
+    search: str | None = Query(default = None),
     condition: str | None = Query(default = None),
     active: bool | None = Query(default = None),
     age: int | None = Query(default = None)
@@ -168,14 +169,13 @@ def getall(
 
     try:
         data = pm.patient_manager.getall(
-            size,
-            offset,
-            condition_str_to_object(condition) if condition else None,
-            active,
-            age
+            size = size,
+            offset = offset,
+            search = search,
+            condition = condition_str_to_object(condition) if condition else None,
+            active = active,
+            age = age
         )
-
-        # Do age later
 
         return [patient_to_json_fmt(d) for d in data]
 
@@ -196,6 +196,8 @@ def update(patient_id: str, data: dict = Body(...)):
         )
 
     try:
+        condition: str | None = data.get("condition") 
+
         pm.patient_manager.update(
             patient_id = patient_id,
             name = data.get("name"),
@@ -204,7 +206,7 @@ def update(patient_id: str, data: dict = Body(...)):
                 if "dob" in data else None
             ),
             number = data.get("number"),
-            condition = condition_str_to_object(data.get("condition")),
+            condition = condition_str_to_object(condition) if condition else None,
             is_active = data.get("is_active")
         )
 

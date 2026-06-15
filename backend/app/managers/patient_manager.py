@@ -16,25 +16,22 @@ class PatientManager:
     def __init__(self, database: Database):
         self.database = database
 
-        self._repo = self.database.patient_repo
-
-        if self._repo is None:
-            raise PMDatabaseError(DatabaseCursorError())
+        try:
+            self._repo: PatientRepository = self.database.patient_repo
+        except DatabaseDisconnectedError as exc:
+            raise PMDatabaseError(exc) from exc
 
         self._reserved_ids: list[str] = []
 
         self._id_len = 6
 
-    def _validate(self):
-        if self._repo is None:
-            raise PMDatabaseError(DatabaseCursorError())
-
     def _validate_inputs(
-            self,
-            id: str | None,
-            name: str | None,
-            dob: date | None,
-            number: str | None):
+        self,
+        id: str | None,
+        name: str | None,
+        dob: date | None,
+        number: str | None
+    ):
         if id is not None:
             if not id:
                 raise PMInvalidInputsError()
@@ -63,10 +60,9 @@ class PatientManager:
                 raise PMInvalidInputsError()
 
     def create(
-            self,
-            patient: Patient) -> str:
-        self._validate()
-
+        self,
+        patient: Patient
+    ) -> str:
         try:
             # Check if it is a reserved id
             if patient.id in self._reserved_ids:
@@ -85,8 +81,6 @@ class PatientManager:
             return patient.id
 
     def delete(self, patient_id: str):
-        self._validate()
-
         try:
             self._repo.delete(patient_id)
 
@@ -100,8 +94,6 @@ class PatientManager:
             self._repo.commit()
 
     def clear(self):
-        self._validate()
-
         try:
             self._repo.clear()
 
@@ -112,8 +104,6 @@ class PatientManager:
             self._repo.commit()
 
     def get(self, patient_id: str) -> Patient | None:
-        self._validate()
-
         try:
             return self._repo.get(patient_id)
 
@@ -121,39 +111,35 @@ class PatientManager:
             raise PMDatabaseError(exc) from exc
 
     def getall(
-            self,
-            size: int | None = None,
-            offset: int | None = None,
-            condition: MedicalCondition | None = None,
-            active: bool | None = None,
-            age: int | None = None
-            ):
-        self._validate()
-
+        self,
+        size: int | None = None,
+        offset: int | None = None,
+        search: str | None = None,
+        condition: MedicalCondition | None = None,
+        active: bool | None = None,
+        age: int | None = None
+    ):
         try:
             return self._repo.getall(
-                    size,
-                    offset,
-                    condition,
-                    active,
-                    age
-                    )
+                size = size,
+                offset = offset,
+                search = search,
+                condition = condition,
+                active = active,
+                age = age
+            )
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
             raise PMDatabaseError(exc) from exc
 
     def get_all_ids(self) -> list[str]:
-        self._validate()
-
         try:
-            return self.repo.get_all_ids()
+            return self._repo.get_all_ids()
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
             raise PMDatabaseError(exc) from exc
 
     def get_name(self, patient_id: str) -> str | None:
-        self._validate()
-
         try:
             return self._repo.get_name(patient_id)
 
@@ -161,8 +147,6 @@ class PatientManager:
             raise PMDatabaseError(exc) from exc
 
     def get_id(self, patient_name: str) -> str | None:
-        self._validate()
-
         try:
             return self._repo.get_id(patient_name)
 
@@ -170,15 +154,14 @@ class PatientManager:
             raise PMDatabaseError(exc) from exc
 
     def update(
-            self,
-            patient_id: str,
-            name: str | None = None,
-            dob: date | None = None,
-            number: str | None = None,
-            condition: MedicalCondition | None = None,
-            is_active: bool | None = None):
-        self._validate()
-
+        self,
+        patient_id: str,
+        name: str | None = None,
+        dob: date | None = None,
+        number: str | None = None,
+        condition: MedicalCondition | None = None,
+        is_active: bool | None = None
+    ):
         try:
             self._validate_inputs(patient_id, name, dob, number)
 
@@ -205,8 +188,6 @@ class PatientManager:
             self._repo.commit()
 
     def exists(self, patient_id: str) -> bool:
-        self._validate()
-
         try:
             return self._repo.exists(patient_id)
 

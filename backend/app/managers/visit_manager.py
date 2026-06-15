@@ -6,6 +6,7 @@ from datetime import date as _date
 from app.common.id_creater import generate_id
 from app.database.database import Database
 from app.database.exceptions import *
+from app.managers.exceptions import *
 from app.database.visit_repo import VisitRepository
 from app.models.visit import Visit
 

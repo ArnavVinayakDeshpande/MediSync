@@ -267,7 +267,17 @@ class WhatsAppTemplateService:
             self,
             template_whatsapp_id: str
     ) -> WhatsAppTemplateGetResult | None:
-        pass
+        if not template_whatsapp_id:
+            raise WhatsAppInvalidInputsError("WhatsApp Template Fetching: empty id given.")
+
+        response = self._client.get(
+            endpoint = template_whatsapp_id,
+            params = None
+        )
+
+        json_value = response.json()
+
+        return self._create_get_result(json_value)
 
     def getall(self) -> list[WhatsAppTemplateGetResult]:
         response = self._client.get(
@@ -325,6 +335,47 @@ class WhatsAppTemplateService:
         return [
             self._create_refresh_approval_status_result(data) for data in template_data
         ]
+
+    def refresh_status_by_id(
+        self,
+        template_id: str
+    ) -> WhatsAppTemplateRefreshStatusResult:
+        if not template_id:
+            raise WhatsAppInvalidInputsError("WhatsApp Template Fetch Status: empty template id given.")
+
+        params = {
+            "fields": "name,status,language"
+        }
+
+        response = self._client.get(
+            endpoint = template_id,
+            params = params
+        )
+
+        json_value = response.json()
+
+        return self._create_refresh_status_result(json_value)
+
+    def refresh_approval_status_by_id(
+        self,
+        template_id: str
+    ) -> WhatsAppRefreshApprovalStatusResult:
+        if not template_id:
+            raise WhatsAppInvalidInputsError("WhatsApp Template Fetch Approval Status: empty template id given.")
+
+
+        params = {
+            "fields": "name,status,language"
+        }
+
+        response = self._client.get(
+            endpoint = template_id,
+            params = params
+        )
+
+        json_vlaue = response.json()
+
+        return self._create_refresh_approval_status_callback(json_value)
 
     def refresh_status_all(self) -> list[WhatsAppTemplateRefreshStatusResult]:
         params = {

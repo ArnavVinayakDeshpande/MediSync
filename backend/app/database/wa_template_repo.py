@@ -2,12 +2,12 @@
 """
 
 import sqlite3 as sql3
-import datetime as datetime
+from datetime import datetime
 import json
 
 from app.database.exceptions import *
 from app.communication.whatsapp.template import (
-    WhatsAppTemplateLanaguage,
+    WhatsAppTemplateLanguage,
     WhatsAppTemplateCategory,
     WhatsAppTemplateApprovalStatus,
     WhatsAppTemplateStatus,

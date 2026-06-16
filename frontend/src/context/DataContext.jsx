@@ -64,6 +64,18 @@ export function DataProvider({ children }) {
     }
   }, [request]);
 
+  const searchPatients = useCallback(async (query, size = 10) => {
+    if (!query) return [];
+    try {
+      const params = new URLSearchParams({ search: query, size });
+      const data = await request(`/patients?${params.toString()}`);
+      return data || [];
+    } catch (err) {
+      console.error("searchPatients failed:", err);
+      return [];
+    }
+  }, [request]);
+
   const generatePatientId = useCallback(async () => {
     return await request("/patients/id");
   }, [request]);
@@ -185,6 +197,7 @@ export function DataProvider({ children }) {
         visits,
 
         refreshPatients,
+        searchPatients,
         generatePatientId,
         getPatient,
         addPatient,

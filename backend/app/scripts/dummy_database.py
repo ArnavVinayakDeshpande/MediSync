@@ -87,8 +87,9 @@ def create_dummy_patient(pid: str) -> Patient:
 
 
 def main():
-    database_path = Path(__file__).parent.parent.parent.parent / "data"
-    database = Database(database_path / "lenest_database.db")
+    database_path = Path(__file__).parent.parent.parent.parent / "data" / "lenest_database.db"
+    print(f"Creating a database: {database_path}")
+    database = Database(database_path)
     manager = PatientManager(database)
 
     for _ in range(1000):

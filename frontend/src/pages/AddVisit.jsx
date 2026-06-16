@@ -1,8 +1,8 @@
 // src/pages/AddVisit.jsx
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle, Loader2, ArrowLeft } from "lucide-react";
+import { AlertCircle, Loader2, ArrowLeft, Search } from "lucide-react";
 import { useData } from "../context/DataContext";
 
 function toDDMMYYYY(isoDate) {
@@ -41,6 +41,7 @@ export default function AddVisit() {
   const [form, setForm] = useState({
     visit_id: "",
     patient_id: "",
+    patient_name: "",
     visit_date: "",
     diagnosis: "",
     prescription: "",
@@ -49,6 +50,47 @@ export default function AddVisit() {
     fees_pending: "",
     follow_up_date: "",
   });
+
+  const { searchPatients } = useData();
+  const [patientResults, setPatientResults] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (!form.patient_name.trim()) {
+        setPatientResults([]);
+        setSearching(false);
+        return;
+      }
+      setSearching(true);
+      const results = await searchPatients(form.patient_name, 10);
+      setPatientResults(results);
+      setSearching(false);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [form.patient_name, searchPatients]);
+
+  const handleSelectPatient = (patient) => {
+    setForm((p) => ({ ...p, patient_id: patient.id, patient_name: patient.name }));
+    setShowDropdown(false);
+  };
+
+  const handlePatientSearchChange = (e) => {
+    set("patient_name", e.target.value);
+    setShowDropdown(true);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -146,12 +188,55 @@ export default function AddVisit() {
                 />
               )}
             </Field>
+
             <Field label="Patient ID" required>
-              <input placeholder="Enter Patient ID" value={form.patient_id}
+              <input
+                placeholder="Enter Patient ID"
+                value={form.patient_id}
                 onChange={(e) => set("patient_id", e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white
-                           text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition" />
+                           text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+              />
             </Field>
+
+            <div className="relative" ref={dropdownRef}>
+              <Field label="Patient Name" required>
+                <input
+                  placeholder="Type to search patients..."
+                  value={form.patient_name}
+                  onChange={handlePatientSearchChange}
+                  onFocus={() => setShowDropdown(true)}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white
+                             text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition"
+                />
+              </Field>
+
+              {showDropdown && form.patient_name.trim() !== "" && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                  {searching ? (
+                    <div className="flex items-center gap-2 px-4 py-3 text-sm text-slate-500">
+                      <Loader2 size={14} className="animate-spin" /> Searching...
+                    </div>
+                  ) : patientResults.length > 0 ? (
+                    <ul className="py-1">
+                      {patientResults.map((p) => (
+                        <li key={p.id}>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectPatient(p)}
+                            className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition"
+                          >
+                            {p.name} - {p.id}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="px-4 py-3 text-sm text-slate-500">No patients found.</div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <Field label="Visit Date" required>

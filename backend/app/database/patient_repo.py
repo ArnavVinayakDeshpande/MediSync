@@ -200,7 +200,7 @@ class PatientRepository:
             if filters:
                 query += " WHERE " + " AND ".join(filters)
 
-            query += " ORDER BY name DESC LIMIT ? OFFSET ?"
+            query += " ORDER BY name ASC LIMIT ? OFFSET ?"
             params.append(size if size else -1)
             params.append(offset if offset is not None else 0)
 

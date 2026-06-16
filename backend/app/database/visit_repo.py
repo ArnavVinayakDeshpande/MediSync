@@ -2,11 +2,17 @@
 """
 
 import sqlite3 as sql3
+from dataclasses import dataclass
 
 from app.models.visit import Visit
 from app.common.converter import *
 from app.database.exceptions import *
 
+
+@dataclass
+class VisitRepositoryGetResult:
+    visit: Visit
+    patient_id: str
 
 class VisitRepository:
     def __init__(self, connection: sql3.Connection):
@@ -57,10 +63,7 @@ class VisitRepository:
         finally:
             cursor.close()
 
-    def _create_visit(self, data: tuple | None) -> Visit | None:
-        if data is None:
-            return None
-
+    def _create_visit(self, data: tuple) -> Visit:
         try:
             return Visit(
                 id=data[0],
@@ -170,7 +173,7 @@ class VisitRepository:
         finally:
             cursor.close()
 
-    def get(self, visit_id: str) -> Visit | None:
+    def get(self, visit_id: str) -> VisitRepositoryGetResult | None:
         cursor = self._get_cursor()
 
         try:
@@ -183,7 +186,10 @@ class VisitRepository:
 
             data = cursor.fetchone()
 
-            return self._create_visit(data)
+            return VisitRepositoryGetResult(
+                    self._create_visit(data),
+                    patient_id = data[1]
+                ) if data is not None else None
 
         except sql3.Error as exc:
             raise DatabaseExecutionError(exc) from exc
@@ -192,13 +198,13 @@ class VisitRepository:
             cursor.close()
 
     def getall(
-            self,
-            patient_id: str | None = None,
-            size: int | None = None,
-            offset: int | None = None ,
-            fees_pending: bool | None = None,
-            follow_up: bool | None = None
-            ) -> list[Visit]:
+        self,
+        patient_id: str | None = None,
+        size: int | None = None,
+        offset: int | None = None ,
+        fees_pending: bool | None = None,
+        follow_up: bool | None = None
+    ) -> list[VisitRepositoryGetResult]:
         cursor = self._get_cursor()
 
         query = "SELECT * FROM visits"
@@ -230,13 +236,18 @@ class VisitRepository:
             params.append(offset if offset is not None else 0)
 
             cursor.execute(
-                    query,
-                    params
+                query,
+                params
             )
 
             data = cursor.fetchall()
 
-            return [self._create_visit(d) for d in data]
+            return [
+                VisitRepositoryGetResult(
+                    visit = self._create_visit(d),
+                    patient_id = d[1]
+                ) for d in data
+            ] 
 
         except sql3.Error as exc:
             raise DatabaseExecutionError(exc) from exc

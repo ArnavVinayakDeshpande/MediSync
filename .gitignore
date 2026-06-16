@@ -8,3 +8,7 @@ __pycache__/
 
 # Data
 data/lenest_database.db
+
+# Pyright
+pyrightconfig.json
+

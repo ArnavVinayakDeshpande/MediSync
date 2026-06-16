@@ -8,13 +8,17 @@ import { TemplatesProvider }    from "./context/TemplatesContext";
 import MainLayout            from "./layouts/MainLayout";
 import Dashboard             from "./pages/Dashboard";
 import Patients              from "./pages/Patients";
+import AddPatient            from "./pages/AddPatient";
+import EditPatient           from "./pages/EditPatient";
+import PatientDetails        from "./pages/PatientDetails";
 import RequestsPending       from "./pages/appointments/RequestsPending";
 import ScheduledAppointments from "./pages/appointments/ScheduledAppointments";
 import PastAppointments      from "./pages/appointments/PastAppointments";
 import SendMessages          from "./pages/SendMessages";
 import MessageTemplates      from "./pages/MessageTemplates";
 import SettingsPage          from "./pages/Settings";
-import Visits from "./pages/Visits";
+import Visits                from "./pages/Visits";
+import AddVisit              from "./pages/AddVisit";
 
 export default function App() {
   return (
@@ -26,13 +30,17 @@ export default function App() {
               <Route element={<MainLayout />}>
                 <Route path="/dashboard"               element={<Dashboard />} />
                 <Route path="/patients"                element={<Patients />} />
+                <Route path="/patients/add"            element={<AddPatient />} />
+                <Route path="/patients/:id"            element={<PatientDetails />} />
+                <Route path="/patients/:id/edit"       element={<EditPatient />} />
                 <Route path="/appointments/requests"   element={<RequestsPending />} />
                 <Route path="/appointments/scheduled"  element={<ScheduledAppointments />} />
                 <Route path="/appointments/past"       element={<PastAppointments />} />
                 <Route path="/send-messages"           element={<SendMessages />} />
                 <Route path="/message-templates"       element={<MessageTemplates />} />
                 <Route path="/settings"                element={<SettingsPage />} />
-                <Route path="/visits" element={<Visits />} />
+                <Route path="/visits"                  element={<Visits />} />
+                <Route path="/visits/add"              element={<AddVisit />} />
               </Route>
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
@@ -41,4 +49,4 @@ export default function App() {
       </AppointmentsProvider>
     </DataProvider>
   );
-}
+}

@@ -1,10 +1,10 @@
 // src/pages/Patients.jsx
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Search, UserPlus, Eye, Pencil, Trash2, X, AlertCircle,
+  Search, UserPlus, Eye, X,
   ArrowUpDown, Filter, ChevronDown, ArrowUp, ArrowDown, Loader2,
-  History,
 } from "lucide-react";
 import { useData } from "../context/DataContext";
 
@@ -671,25 +671,31 @@ export default function Patients() {
   const {
     patients, loading, error,
     refreshPatients,
-    generatePatientId,
-    addPatient, updatePatient, deletePatient, fetchPatientDetails,
   } = useData();
+  const navigate = useNavigate();
 
   const [query,           setQuery]           = useState("");
+  const [debouncedQuery,  setDebouncedQuery]  = useState("");
   const [sortKey,         setSortKey]         = useState("name");
   const [sortDir,         setSortDir]         = useState("asc");
   const [filterActive,    setFilterActive]    = useState(null);
   const [filterCondition, setFilterCondition] = useState(null);
   const [filterAge,       setFilterAge]       = useState(null);
   const [page,            setPage]            = useState(0);
-  const [modal,           setModal]           = useState(null);
-  const [idFetching,      setIdFetching]      = useState(false);
-  const [idFetchError,    setIdFetchError]    = useState(null);
 
   const handleSort = (key) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortKey(key); setSortDir("asc"); }
   };
+
+  // ── Debounce the search query by 500ms ──
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+      setPage(0);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const activeFilterCount =
     (filterActive    !== null ? 1 : 0) +
@@ -703,8 +709,9 @@ export default function Patients() {
       condition: filterCondition,
       active:    filterActive,
       age:       filterAge,
+      search:     debouncedQuery,
     });
-  }, [refreshPatients, page, filterCondition, filterActive, filterAge]);
+  }, [refreshPatients, page, filterCondition, filterActive, filterAge, debouncedQuery]);
 
   const updateFilterActive    = (v) => { setFilterActive(v);    setPage(0); };
   const updateFilterCondition = (v) => { setFilterCondition(v); setPage(0); };
@@ -712,14 +719,7 @@ export default function Patients() {
 
   const displayed = useMemo(() => {
     let list = [...(patients || [])];
-    if (query.trim()) {
-      const q = query.toLowerCase();
-      list = list.filter((p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.id.includes(q) ||
-        (p.number || "").includes(q)
-      );
-    }
+    // Search is now handled server-side via the `query` param — no local filtering needed
     list.sort((a, b) => {
       let av, bv;
       if (sortKey === "name") { av = a.name.toLowerCase();    bv = b.name.toLowerCase(); }
@@ -730,41 +730,7 @@ export default function Patients() {
       return 0;
     });
     return list;
-  }, [patients, query, sortKey, sortDir]);
-
-  const openAddModal = async () => {
-    setIdFetching(true);
-    setIdFetchError(null);
-    try {
-      const generatedId = await generatePatientId();
-      setModal({ type: "add", generatedId });
-    } catch (err) {
-      setIdFetchError("Could not generate a Patient ID. Try again.");
-      console.error("generatePatientId failed:", err);
-    } finally {
-      setIdFetching(false);
-    }
-  };
-
-  const handleAdd    = async (fd) => { await addPatient(fd);    setModal(null); };
-  const handleEdit   = async (fd) => { await updatePatient(fd); setModal(null); };
-  const handleDelete = async (id) => { await deletePatient(id); setModal(null); };
-
-  const openEdit = (details) => {
-    const md = details.metadata;
-    setModal({
-      type: "edit",
-      initial: {
-        id:        md.id,
-        name:      md.name,
-        // Convert DD-MM-YYYY (backend) → YYYY-MM-DD so the date input pre-fills
-        dob:       toYYYYMMDD(md.dob),
-        number:    md.number,
-        condition: md.condition || "",
-        is_active: String(md.is_active),
-      },
-    });
-  };
+  }, [patients, sortKey, sortDir]);
 
   if (loading) {
     return (
@@ -786,14 +752,6 @@ export default function Patients() {
         <div className="mb-4 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-sm text-rose-700">
           <p className="font-semibold">Backend connection error</p>
           <p className="font-mono text-xs mt-0.5">{error}</p>
-        </div>
-      )}
-
-      {idFetchError && (
-        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm
-                        text-amber-700 flex items-start gap-2">
-          <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />
-          <span>{idFetchError}</span>
         </div>
       )}
 
@@ -825,13 +783,11 @@ export default function Patients() {
             filterAge={filterAge}             setFilterAge={updateFilterAge}
           />
 
-          <button onClick={openAddModal} disabled={idFetching}
+          <button onClick={() => navigate("/patients/add")}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700
-                       disabled:bg-indigo-400 text-white text-sm font-semibold px-4 py-2.5
+                       text-white text-sm font-semibold px-4 py-2.5
                        rounded-xl shadow-sm transition-colors whitespace-nowrap">
-            {idFetching
-              ? <><Loader2 size={15} className="animate-spin" /> Generating ID…</>
-              : <><UserPlus size={15} /> Add Patient</>}
+            <UserPlus size={15} /> Add Patient
           </button>
         </div>
 
@@ -897,7 +853,7 @@ export default function Patients() {
                     <td className="px-5 py-3.5"><ActiveBadge active={p.is_active} /></td>
                     <td className="px-5 py-3.5">
                       <button
-                        onClick={() => setModal({ type: "view", patientId: p.id })}
+                        onClick={() => navigate(`/patients/${p.id}`)}
                         className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600
                                    hover:text-indigo-800 hover:bg-indigo-50 px-2.5 py-1.5
                                    rounded-lg transition-colors">
@@ -939,28 +895,6 @@ export default function Patients() {
           </div>
         </div>
       </div>
-
-      {/* Modals */}
-      {modal?.type === "add" && (
-        <PatientForm title="Add New Patient"
-          initial={{ ...EMPTY_FORM, id: modal.generatedId || "" }}
-          isEdit={false} idIsGenerated={!!modal.generatedId}
-          patients={patients || []} onSave={handleAdd} onClose={() => setModal(null)} />
-      )}
-      {modal?.type === "edit" && (
-        <PatientForm title="Edit Patient" initial={modal.initial}
-          isEdit={true} idIsGenerated={false}
-          patients={patients || []} onSave={handleEdit} onClose={() => setModal(null)} />
-      )}
-      {modal?.type === "view" && (
-        <ViewDetailsModal
-          patientId={modal.patientId}
-          fetchPatientDetails={fetchPatientDetails}
-          onClose={() => setModal(null)}
-          onEdit={(details) => { setModal(null); openEdit(details); }}
-          onDelete={handleDelete}
-        />
-      )}
     </div>
   );
 }

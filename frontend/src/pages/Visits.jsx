@@ -9,6 +9,7 @@
 // Clicking a patient name opens a read-only patient preview via GET /patients/{id}
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Eye, Pencil, Trash2, X, AlertCircle, Loader2,
   Search, ArrowUpDown, ArrowUp, ArrowDown, User, UserPlus
@@ -599,49 +600,58 @@ function SortBtn({ sortKey, currentKey, sortDir, label, onClick }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+const PAGE_SIZE = 50;
+
 export default function Visits() {
   const {
     fetchPatientDetails,
     visits,
     refreshVisits,
     getVisit,
-    addVisit,
     updateVisit,
     deleteVisit,
-    generateVisitId,
   } = useData();
+  const navigate = useNavigate();
 
-  const [loading,    setLoading]    = useState(true);
-  const [fetchError, setFetchError] = useState(null);
-  const [query,      setQuery]      = useState("");
-  const [sortKey,    setSortKey]    = useState("visit_date");
-  const [sortDir,    setSortDir]    = useState("desc");
+  const [loading,         setLoading]         = useState(true);
+  const [fetchError,      setFetchError]      = useState(null);
+  const [query,           setQuery]           = useState("");
+  const [debouncedQuery,  setDebouncedQuery]  = useState("");
+  const [sortKey,         setSortKey]         = useState("visit_date");
+  const [sortDir,         setSortDir]         = useState("desc");
+  const [page,            setPage]            = useState(0);
 
-  // modal: null | { type: "addVisit" } | { type: "view", visit } 
+  // modal: null | { type: "view", visit } 
   //        | { type: "edit", visit } | { type: "patientPreview", patientId }
   const [modal, setModal] = useState(null);
 
-  // ── Load all visits ──────────────────────────────────────────────────────
+  // ── Debounce the search query by 500ms ──
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+      setPage(0);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // ── Load visits (with search + pagination) ──
   const loadVisits = useCallback(async () => {
     setLoading(true);
     try {
-      await refreshVisits();
+      await refreshVisits({
+        size:   PAGE_SIZE,
+        offset: page * PAGE_SIZE,
+        search: debouncedQuery,
+      });
       setFetchError(null);
     } catch (err) {
       setFetchError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [refreshVisits]);
+  }, [refreshVisits, page, debouncedQuery]);
 
   useEffect(() => { loadVisits(); }, [loadVisits]);
-
-  // ── Add visit ────────────────────────────────────────────────────────────
-  const handleAddVisit = async (visitData) => {
-    await addVisit(visitData);
-    await loadVisits();
-    setModal(null);
-  };
 
   // ── Update visit ─────────────────────────────────────────────────────────
   const handleUpdateVisit = async (visitId, changes) => {
@@ -674,15 +684,7 @@ export default function Visits() {
   // ── Filter + sort ────────────────────────────────────────────────────────
   const displayed = useMemo(() => {
     let list = [...visits];
-    if (query.trim()) {
-      const q = query.toLowerCase();
-      list = list.filter((v) =>
-        String(v.visit_id).includes(q) ||
-        (v.patient_name || "").toLowerCase().includes(q) ||
-        (v.patient_id   || "").includes(q) ||
-        (v.visit_date   || "").includes(q)
-      );
-    }
+    // Search is now handled server-side via the `search` param — no local filtering needed
     list.sort((a, b) => {
       let av, bv;
       if (sortKey === "visit_id")     { av = a.visit_id;              bv = b.visit_id; }
@@ -694,7 +696,7 @@ export default function Visits() {
       return 0;
     });
     return list;
-  }, [visits, query, sortKey, sortDir]);
+  }, [visits, sortKey, sortDir]);
 
   return (
     <div>
@@ -705,7 +707,7 @@ export default function Visits() {
           <p className="mt-1 text-slate-500">All patient visits across the portal.</p>
         </div>
         <button
-          onClick={() => setModal({ type: "addVisit" })}
+          onClick={() => navigate("/visits/add")}
           className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition"
         >
           <UserPlus size={16} />
@@ -828,19 +830,28 @@ export default function Visits() {
             </tbody>
           </table>
         </div>
-        <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 text-xs text-slate-400">
-          {displayed.length} of {visits.length} visits
+        <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 text-xs text-slate-500
+                        flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <span>Page {page + 1} · Showing {displayed.length} of up to {PAGE_SIZE} visits</span>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600
+                         font-semibold hover:border-indigo-300 disabled:opacity-50
+                         disabled:cursor-not-allowed transition">
+              Previous
+            </button>
+            <button onClick={() => setPage((p) => p + 1)}
+              disabled={(visits || []).length < PAGE_SIZE}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600
+                         font-semibold hover:border-indigo-300 disabled:opacity-50
+                         disabled:cursor-not-allowed transition">
+              Next
+            </button>
+          </div>
         </div>
       </div>
 
       {/* ── Modals ── */}
-      {modal?.type === "addVisit" && (
-        <AddVisitModal
-          generateVisitId={generateVisitId}
-          onSave={handleAddVisit}
-          onClose={() => setModal(null)}
-        />
-      )}
 
       {modal?.type === "view" && (
         <VisitDetailsModal

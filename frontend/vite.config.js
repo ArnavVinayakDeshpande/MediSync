@@ -22,14 +22,16 @@ export default defineConfig({
       // accidentally intercept '/patients/...' calls.
       //
       // Update the target port/host when the backend team provides the URL.
-      '/patients': {
-        target: 'http://127.0.0.1:8000 ',  // ← update when finalised
+      '/api/patients': {
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
       },
 
-      '/visits': {
+      '/api/visits': {
         target: 'http://127.0.0.1:8000',
-        changeOrigin: true
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
       }
     }
   }

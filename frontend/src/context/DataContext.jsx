@@ -11,7 +11,7 @@ import {
 
 const DataContext = createContext(null);
 
-const API = "";
+const API = "/api";
 
 export function DataProvider({ children }) {
   const [patients, setPatients] = useState([]);

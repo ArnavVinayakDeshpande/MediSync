@@ -7,6 +7,7 @@ from fastapi import Body
 from fastapi import Query
 
 import app.managers.visit_manager as vm
+import app.managers.patient_manager as pm
 from app.managers.exceptions import *
 from app.models.visit import Visit
 from app.common.converter import *
@@ -20,6 +21,12 @@ router = APIRouter(
 # Create
 @router.post("")
 def create(data: dict = Body(...)):
+    if pm.patient_manager is None:
+        raise HTTPException(
+            status_code = 500,
+            detail = "Patient manager has not been initialized, Visit Manager needs Patient Manager to be initialized."
+        )
+
     if vm.visit_manager is None:
         raise HTTPException(
             status_code = 500,
@@ -31,10 +38,16 @@ def create(data: dict = Body(...)):
             patient_id = data["patient_id"],
             visit = visit_from_json_fmt(data)
         )
+        
+        patient_name = pm.patient_manager.get_name(data["patient_id"])
+
+        # Patient name will definitely be not None, since if patient does not exist then 
+        # visit_manager will throw exception
 
         return {
+            "sucess": True,
             "visit_id": created_id,
-            "sucess": True
+            "patient_name": patient_name
         }
 
     except VMDuplicateEntryError as exc:
@@ -134,6 +147,12 @@ def get(visit_id: str):
             detail = "Visit Manager has not been initialized."
         )
 
+    if pm.patient_manager is None:
+        raise HTTPException(
+            status_code = 500,
+            detail = "Patient Manager has not been initialized."
+        )
+
     try:
         data = vm.visit_manager.get(visit_id)
 
@@ -143,7 +162,19 @@ def get(visit_id: str):
                 detail = "The requested visit does not exist."
             )
 
-        return visit_to_json_fmt(data)
+        patient_name = pm.patient_manager.get_name(data.patient_id)
+
+        if patient_name is None:
+            raise HTTPException(
+                status_code = 500,
+                detail = "Issue detected! Internal database might be corrupted."
+            )
+
+        return visit_to_json_fmt(
+            visit = data.visit,
+            patient_id = data.patient_id,
+            patient_name = patient_name
+        )
 
     except VMDatabaseError as exc:
         raise HTTPException(
@@ -165,6 +196,12 @@ def getall(
             detail = "Visit Manager has not been initialized."
         )
 
+    if pm.patient_manager is None:
+        raise HTTPException(
+            status_code = 500,
+            detail = "Patient Manager has not been initialized."
+        )
+
     try:
         data = vm.visit_manager.getall(
             patient_id,
@@ -174,7 +211,23 @@ def getall(
             follow_up
         )
 
-        return [visit_to_json_fmt(d) for d in data]
+        patient_names = [
+            pm.patient_manager.get_name(visit.patient_id) for visit in data
+        ]
+
+        if any(patient_name is None for patient_name in patient_names):
+            raise HTTPException(
+                status_code = 500,
+                detail = "Issue Detected! Internal database might be corrupted."
+            )
+
+        return [
+            visit_to_json_fmt(
+                visit = data[i].visit,
+                patient_id = data[i].patient_id,
+                patient_name = patient_names[i] # pyright: ignore[reportArgumentType] (for pyright)
+            ) for i in range(len(data))
+        ]
 
     except VMDatabaseError as exc:
         raise HTTPException(

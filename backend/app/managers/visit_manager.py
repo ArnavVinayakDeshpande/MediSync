@@ -2,39 +2,42 @@
 """
 
 from datetime import date as _date
+from dataclasses import dataclass
 
 from app.common.id_creater import generate_id
 from app.database.database import Database
 from app.database.exceptions import *
 from app.managers.exceptions import *
-from app.database.visit_repo import VisitRepository
+from app.database.visit_repo import VisitRepository, VisitRepositoryGetResult
 from app.models.visit import Visit
 
+
+@dataclass
+class VisitManagerGetResult:
+    visit: Visit
+    patient_id: str
 
 class VisitManager:
     def __init__(self, database: Database):
         self.database = database
 
-        self._repo = self.database.visit_repo
+        try:
+            self._repo: VisitRepository = self.database.visit_repo
 
-        if self._repo is None:
-            raise VMDatabaseError(DatabaseCursorError())
+        except DatabaseDisconnectedError as exc:
+            raise VMDatabaseError(exc) from exc
 
         self._reserved_ids: list[str] = []
-
         self._id_len = 8
 
-    def _validate(self):
-        if self._repo is None:
-            raise VMDatabaseError(DatabaseCursorError())
-
     def _validate_inputs(
-            self,
-            id: str | None,
-            date: _date | None,
-            fees_paid: float,
-            fees_pending: float,
-            follow_up_date: _date | None):
+        self,
+        id: str | None,
+        date: _date | None,
+        fees_paid: float,
+        fees_pending: float,
+        follow_up_date: _date | None
+    ):
         if id is not None:
             if not id:
                 raise VMInvalidInputsError()
@@ -61,20 +64,25 @@ class VisitManager:
             if follow_up_date < todays_date:
                 raise VMInvalidInputsError()
 
-    def create(
-            self,
-            patient_id: str,
-            visit: Visit) -> str:
-        self._validate()
+    def _to_vm_get_result(self, result: VisitRepositoryGetResult) -> VisitManagerGetResult:
+        return VisitManagerGetResult(
+            visit = result.visit,
+            patient_id = result.patient_id 
+        )
 
+    def create(
+        self,
+        patient_id: str,
+        visit: Visit
+    ) -> str:
         try:
             self._validate_inputs(
-                    id = visit.id,
-                    date = visit.date,
-                    fees_paid = visit.fees_paid,
-                    fees_pending = visit.fees_pending,
-                    follow_up_date = visit.follow_up_date
-                    )
+                id = visit.id,
+                date = visit.date,
+                fees_paid = visit.fees_paid,
+                fees_pending = visit.fees_pending,
+                follow_up_date = visit.follow_up_date
+            )
 
             if visit.id in self._reserved_ids:
                 self._reserved_ids.remove(visit.id)
@@ -92,8 +100,6 @@ class VisitManager:
             return visit.id
 
     def delete(self, visit_id: str):
-        self._validate()
-
         try:
             self._repo.delete(visit_id)
 
@@ -107,8 +113,6 @@ class VisitManager:
             self._repo.commit()
 
     def deleteall(self, patient_id: str):
-        self._validate()
-
         try:
             self._repo.deleteall(patient_id)
 
@@ -119,8 +123,6 @@ class VisitManager:
             self._repo.commit()
 
     def clear(self):
-        self._validate()
-
         try:
             self._repo.clear()
 
@@ -130,57 +132,58 @@ class VisitManager:
         else:
             self._repo.commit()
 
-    def get(self, visit_id: str) -> Visit | None:
-        self._validate()
-
+    def get(self, visit_id: str) -> VisitManagerGetResult | None:
         try:
-            return self._repo.get(visit_id)
+            data = self._repo.get(visit_id)
+
+            return self._to_vm_get_result(data) if data is not None else None
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
            raise VMDatabaseError(exc) from exc
 
     def getall(
-            self,
-            patient_id: str | None = None,
-            size: int | None = None,
-            offset: int | None = None,
-            fees_pending: bool | None = None,
-            follow_up: bool | None = None) -> list[Visit]:
-        self._validate()
-
+        self,
+        patient_id: str | None = None,
+        size: int | None = None,
+        offset: int | None = None,
+        fees_pending: bool | None = None,
+        follow_up: bool | None = None
+    ) -> list[VisitManagerGetResult]:
         try:
-            return self._repo.getall(
-                    patient_id = patient_id,
-                    size = size,
-                    offset = offset,
-                    fees_pending = fees_pending,
-                    follow_up = follow_up
+            return [
+                self._to_vm_get_result(visit) for visit in (
+                    self._repo.getall(
+                        patient_id = patient_id,
+                        size = size,
+                        offset = offset,
+                        fees_pending = fees_pending,
+                        follow_up = follow_up
                     )
+                )
+            ]
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
             raise VMDatabaseError(exc) from exc
 
     def update(
-            self,
-            visit_id: str,
-            date: _date | None = None,
-            diagnosis: str | None = None,
-            prescription: str | None = None,
-            notes: str | None = None,
-            fees_paid: float | None = None,
-            fees_pending: float | None = None,
-            follow_up_date: _date | None = None
-            ):
-        self._validate()
-
+        self,
+        visit_id: str,
+        date: _date | None = None,
+        diagnosis: str | None = None,
+        prescription: str | None = None,
+        notes: str | None = None,
+        fees_paid: float | None = None,
+        fees_pending: float | None = None,
+        follow_up_date: _date | None = None
+    ):
         try:
             self._validate_inputs(
-                    id = visit_id,
-                    date = date,
-                    fees_paid = fees_paid if fees_paid is not None else 0,
-                    fees_pending = fees_pending if fees_pending is not None else 0,
-                    follow_up_date = follow_up_date
-                    )
+                id = visit_id,
+                date = date,
+                fees_paid = fees_paid if fees_paid is not None else 0,
+                fees_pending = fees_pending if fees_pending is not None else 0,
+                follow_up_date = follow_up_date
+            )
 
             visit = self.get(visit_id)
 
@@ -204,8 +207,6 @@ class VisitManager:
             raise VMAbsentEntryError() from exc
 
     def exists(self, visit_id: str) -> bool:
-        self._validate()
-
         try:
             return self._repo.exists(visit_id)
 

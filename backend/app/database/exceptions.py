@@ -1,61 +1,61 @@
 """
 """
 
-from sqlite3 import Error as sql3_error
+from sqlite3 import Error as SqliteError
 
 
 class DatabaseDisconnectedError(Exception):
-    _MESSAGE = "Could not connect to the database."
+    """Raised when a connection to the database cannot be established."""
 
-    def __init__(self) -> None:
-        super().__init__(self._MESSAGE)
+    _MESSAGE = "Failed to establish a connection to the database."
 
-    def message(self) -> str:
-        return self._MESSAGE
+    def __init__(self, exc: Exception | None = None):
+        if exc is None:
+            super().__init__(self._MESSAGE)
+        else:
+            super().__init__(f"{self._MESSAGE} {exc}")
 
 class DatabaseCursorError(Exception):
-    _MESSAGE = "Could not fetch database cursor."
+    _MESSAGE = "Failed to create database cursor: {exc}"
 
-    def __init__(self) -> None:
-        super().__init__(self._MESSAGE)
-
-    def message(self) -> str:
-        return self._MESSAGE
+    def __init__(self, exc: SqliteError):
+        super().__init__(self._MESSAGE.format(exc=exc))
 
 class DatabaseExecutionError(Exception):
-    _MESSAGE = "Error in database: {exc}"
+    """Raised when execution of a database operation fails."""
 
-    def __init__(self, sql_error: sql3_error) -> None:
-        self._msg = self._MESSAGE.format(exc=sql_error)
-        super().__init__(self._msg)
+    _MESSAGE = "Database operation failed: {exc}"
 
-    def message(self) -> str:
-        return self._msg
+    def __init__(self, sql_error: SqliteError):
+        super().__init__(self._MESSAGE.format(exc=sql_error))
+
 
 class DatabaseDuplicateEntryError(Exception):
-    _MESSAGE = "Duplicate entry given."
+    """Raised when attempting to insert a duplicate entry."""
 
-    def __init__(self) -> None:
+    _MESSAGE = "An entry with the same unique key already exists."
+
+    def __init__(self):
         super().__init__(self._MESSAGE)
 
-    def message(self) -> str:
-        return self._MESSAGE
 
 class DatabaseAbsentEntryError(Exception):
-    _MESSAGE = "Entry is absent."
+    """Raised when the requested entry does not exist."""
 
-    def __init__(self) -> None:
+    _MESSAGE = "The requested entry does not exist in the database."
+
+    def __init__(self):
         super().__init__(self._MESSAGE)
 
-    def message(self) -> str:
-        return self._MESSAGE
 
 class DatabaseParsingError(Exception):
-    _MESSAGE = "Could not parse database data into an object."
+    """Raised when database data cannot be converted into an object."""
 
-    def __init__(self) -> None:
-        super().__init__(self._MESSAGE)
+    _MESSAGE = "Failed to parse database data into the required object."
 
-    def message(self) -> str:
-        return self._MESSAGE
+    def __init__(self, exc: Exception | None = None):
+        if exc is None:
+            super().__init__(self._MESSAGE)
+        else:
+            super().__init__(f"{self._MESSAGE} ({exc})")
 

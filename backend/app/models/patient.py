@@ -3,23 +3,18 @@
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date
 
 from .visit import Visit
 from .medical_condition import MedicalCondition
 
 
 @dataclass
-class PatientMetadata:
+class Patient:
+    id: str
     name: str
-    dob: datetime
+    dob: date | None
     number: str
     condition: MedicalCondition
     is_active: bool
-
-@dataclass
-class Patient:
-    id: int
-    metadata: PatientMetadata
-    visits: list[Visit]
 

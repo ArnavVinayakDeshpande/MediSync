@@ -4,4 +4,7 @@ __pycache__/
 
 # Neovim
 .vim/
+*.xlsx
 
+# Data
+data/lenest_database.db

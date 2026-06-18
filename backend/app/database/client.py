@@ -39,20 +39,9 @@ class MongoDBClient:
         except PyMongoError as exc:
             raise DatabaseDisconnectedError(exc) from exc
 
-        self._hospital_db = self.get_database("hospital_db")
-        self._whatsapp_db = self.get_database("whatsapp_db")
-
     @property
     def client(self) -> MongoClient:
         return self._client
-
-    @property
-    def hospital_db(self) -> Database:
-        return self._hospital_db
-
-    @property
-    def whatsapp_db(self) -> Database:
-        return self._whatsapp_db
 
     def get_database(self, name: str) -> Database:
         try:

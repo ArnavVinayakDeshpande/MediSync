@@ -1,7 +1,12 @@
 """
 """
 
-import sqlite3 as sql3
+from datetime import date
+from pymongo.collection import Collection
+from pymongo.errors import (
+    PyMongoError,
+    DuplicateKeyError
+)
 
 from app.database.exceptions import *
 from app.models.patient import Patient
@@ -9,326 +14,225 @@ from app.models.medical_condition import MedicalCondition
 from app.common.converter import (
     date_to_db_fmt,
     date_from_db_fmt,
+    patient_to_db_fmt,
+    patient_from_db_fmt,
     age_to_date_range
 )
 
 
+type PatientRepositoryGetFieldsResult = dict[str, str | date | MedicalCondition | bool] | None
+
 class PatientRepository:
-    def __init__(self, connection: sql3.Connection):
-        self.connection = connection
+    def __init__(self, collection: Collection) -> None:
+        self._collection = collection
 
-        self._ensure_initialized()
+        # Create the indices
+        self._collection.create_index(
+            "id",
+            unique = True
+        )
 
-    def _get_cursor(self):
+        self._collection.create_index(
+            keys = "number",
+            unique = True
+        )
+    
+    @property
+    def collection(self) -> Collection:
+        return self._collection
+
+    def insert(
+        self,
+        patient: Patient
+    ) -> None:
         try:
-            return self.connection.cursor()
+            self._collection.insert_one(
+                document = patient_to_db_fmt(patient = patient)
+            ) 
 
-        except sql3.Error as exc:
-            raise DatabaseCursorError(exc) from exc
+        except DuplicateKeyError as exc:
+            raise DatabaseDuplicateEntryError() from exc
 
-    def _ensure_initialized(self):
-        cursor = self._get_cursor()
-
-        try:
-            cursor.execute(
-            """
-                    CREATE TABLE IF NOT EXISTS 
-                           patients (
-                               id TEXT PRIMARY KEY NOT NULL,
-                               name TEXT NOT NULL,
-                               dob TEXT,
-                               number TEXT UNIQUE,
-                               condition TEXT,
-                               is_active INT
-                           )
-                """
-            )
-
-            self.commit()
-
-        except sql3.Error as exc:
+        except PyMongoError as exc:
             raise DatabaseExecutionError(exc) from exc
 
-        finally:
-            cursor.close()
-
-    def _create_patient(self, data: tuple) -> Patient:
+    def delete(self, patient_id: str) -> None:
         try:
-            return Patient(
-                id = data[0],
-                name = data[1],
-                dob = date_from_db_fmt(data[2]),
-                number = data[3],
-                condition = MedicalCondition(data[4]),
-                is_active = data[5]
+            result = self._collection.delete_one(
+                filter = {
+                    "id": patient_id
+                }
             )
-
-        except Exception as exc:
-            raise DatabaseParsingError() from exc
-
-    def insert(self, patient: Patient):
-        cursor = self._get_cursor() 
-
-        try:
-            cursor.execute(
-                """
-                    INSERT INTO 
-                        patients (
-                            id, 
-                            name,
-                            dob,
-                            number,
-                            condition,
-                            is_active
-                        )
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    patient.id,
-                    patient.name,
-                    date_to_db_fmt(patient.dob),
-                    patient.number,
-                    patient.condition,
-                    int(patient.is_active)
-                )
-            )
-
-        except sql3.IntegrityError:
-            raise DatabaseDuplicateEntryError() 
-
-        except sql3.Error as exc:
-            raise DatabaseExecutionError(exc) from exc
-
-        finally:
-            cursor.close()
-
-    def delete(self, patient_id: str):
-        cursor = self._get_cursor()
-
-        try:
-            cursor.execute(
-                """
-                    DELETE FROM patients WHERE id = ?
-                """,
-                (patient_id,)
-            )
-
-            if cursor.rowcount == 0:
+            
+            if result.deleted_count == 0:
                 raise DatabaseAbsentEntryError()
 
-        except sql3.Error as exc:
+        except PyMongoError as exc:
             raise DatabaseExecutionError(exc) from exc
-
-        finally:
-            cursor.close()
-
-    def clear(self):
-        cursor = self._get_cursor()
-
-        try:
-            cursor.execute(
-                """
-                    DELETE FROM patients
-                """
-            )
-
-        except sql3.Error as exc:
-            raise DatabaseExecutionError(exc) from exc
-
-        finally:
-            cursor.close()
 
     def get(self, patient_id: str) -> Patient | None:
-        cursor = self._get_cursor()
-
         try:
-            cursor.execute(
-                """
-                    SELECT * FROM patients WHERE id = ?
-                """,
-                    (patient_id,)
+            patient = self._collection.find_one(
+                filter = {
+                    "id": patient_id
+                }
             )
 
-            data = cursor.fetchone()
+            return patient_from_db_fmt(patient) if patient is not None else None
 
-            if data is None:
-                return None
-
-            return self._create_patient(data)
-
-        except sql3.Error as exc:
+        except PyMongoError as exc:
             raise DatabaseExecutionError(exc) from exc
-
-        finally:
-            cursor.close()
 
     def getall(
         self,
-        size: int | None = None,
-        offset: int | None = None,
-        search: str | None = None,
+        size: int = 0,
+        offset: int = 0,
         condition: MedicalCondition | None = None,
-        active: bool | None = None,
+        is_active: bool | None = None,
         age: int | None = None
     ) -> list[Patient]:
-        cursor = self._get_cursor()
+        query = {}
 
-        query = "SELECT * FROM patients"
-        params = []
-        filters = []
+        if condition is not None:
+            query["condition"] = condition.value
 
-        try:
-            if condition is not None:
-                filters.append("condition = ?")
-                params.append(condition.value)
+        if is_active is not None:
+            query["is_active"] = is_active
 
-            if active is not None:
-                filters.append("is_active = ?")
-                params.append(int(active))
+        if age is not None:
+            date_range = age_to_date_range(age)
 
-            if search is not None:
-                filters.append("name LIKE ?")
-                params.append(search + "%")
-
-            if age is not None:
-                date_range = age_to_date_range(age)
-                filters.append("dob >= ?")
-                filters.append("dob <= ?")
-                params.append(date_range[0])
-                params.append(date_range[1])
-
-            if filters:
-                query += " WHERE " + " AND ".join(filters)
-
-            query += " ORDER BY name ASC LIMIT ? OFFSET ?"
-            params.append(size if size else -1)
-            params.append(offset if offset is not None else 0)
-
-            cursor.execute(
-                query,
-                params
-            )
-
-            data = cursor.fetchall()
-
-            return [self._create_patient(d) for d in data]
-
-        except sql3.Error as exc:
-            raise DatabaseExecutionError(exc) from exc
-
-        finally:
-            cursor.close()
-
-    def get_all_ids(self) -> list[str]:
-        cursor = self._get_cursor()
+            query["dob"] = {
+                "$lte": date_range[1],
+                "$gte": date_range[0]
+            }
 
         try:
-            cursor.execute(
-                """
-                    SELECT id FROM patients
-                """
-            )
-
-            return [row[0] for row in cursor.fetchall()]
-
-        except sql3.Error as exc:
-            raise DatabaseExecutionError(exc) from exc
-
-    def get_name(self, patient_id: str) -> str | None:
-        cursor = self._get_cursor()
-
-        try:
-            cursor.execute(
-                """
-                    SELECT name FROM patients WHERE id = ?
-                """,
-                (patient_id,)
-            )
-
-            return cursor.fetchone()
-
-        except sql3.Error as exc:
-            raise DatabaseExecutionError(exc) from exc
-
-        finally:
-            cursor.close()
-
-    def get_id(self, patient_name: str) -> str | None:
-        cursor = self._get_cursor()
-
-        try:
-            cursor.execute(
-                """
-                    SELECT id FROM patients WHERE name = ?
-                """,
-                (patient_name,)
-            )
-
-            return cursor.fetchone()
-
-        except sql3.Error as exc:
-            raise DatabaseExecutionError(exc) from exc
-
-        finally:
-            cursor.close()
-
-    def update(self, patient: Patient):
-        cursor = self._get_cursor()
-
-        try:
-            cursor.execute(
-                """
-                    UPDATE patients
-                    SET 
-                        name = ?,
-                        dob = ?,
-                        number = ?,
-                        condition = ?,
-                        is_active = ?
-                    WHERE id = ?
-                """,
-                (
-                    patient.name,
-                    date_to_db_fmt(patient.dob),
-                    patient.number,
-                    patient.condition,
-                    int(patient.is_active),
-                    patient.id
+            result = (
+                self._collection
+                .find(query)
+                .sort(
+                    [
+                        ("name", 1),
+                        ("id", 1)
+                    ]
                 )
+                .skip(offset)
+                .limit(size)
             )
 
-            if cursor.rowcount == 0:
+            return [
+                patient_from_db_fmt(patient) for patient in result
+            ]
+
+        except PyMongoError as exc:
+            raise DatabaseExecutionError(exc) from exc
+
+    def getid(self, patient_name: str) -> str | None:
+        if not patient_name:
+            return None
+
+        try:
+           result = self._collection.find_one(
+                {
+                    "name": patient_name
+                },
+                {
+                    "id": 1,
+                    "_id": 0
+                }
+            ) 
+
+           return result["id"] if result else None
+
+        except PyMongoError as exc:
+            raise DatabaseExecutionError(exc) from exc
+
+    def getfields(
+        self,
+        patient_id: str,
+        name: bool = False,
+        dob: bool = False,
+        number: bool = False,
+        condition: bool = False,
+        is_active: bool = False
+    ) -> PatientRepositoryGetFieldsResult:
+        if not patient_id:
+            return None
+
+        query = {}
+
+        query["_id"] = 0
+        query["id"] = 1
+        query["name"] = int(name)
+        query["dob"] = int(dob)
+        query["number"] = int(number)
+        query["condition"] = int(condition)
+        query["is_active"] = int(is_active)
+
+        try:
+            result = self._collection.find_one(
+                {
+                    "id": patient_id
+                },
+                query
+            )
+
+            if result is None:
+                return None
+
+            if dob:
+                result["dob"] = date_from_db_fmt(result["dob"])
+
+            if condition:
+                result["condition"] = MedicalCondition(result["condition"])
+
+            if is_active:
+                result["is_active"] = bool(result["is_active"])
+
+            return result
+
+        except PyMongoError as exc:
+            raise DatabaseExecutionError(exc) from exc
+    
+
+    def update(
+        self,
+        patient_id: str,
+        name: str | None = None,
+        dob: date | None = None,
+        number: str | None = None,
+        condition: MedicalCondition | None = None,
+        is_active: bool | None = None
+    ) -> None:
+        set_dict = {
+            **({"name": name} if name else {}),
+            **({"dob": date_to_db_fmt(dob)} if dob is not None else {}),
+            **({"number": number} if number else {}),
+            **({"condition": condition.value} if condition is not None else {}),
+            **({"is_active": is_active} if is_active is not None else {})
+        }
+
+        if not set_dict:
+            # No values to update
+            return
+
+        try:
+            result = self._collection.update_one(
+                {
+                    "id": patient_id
+                },
+                {
+                    "$set":  set_dict
+                }
+            )
+
+            if result.matched_count == 0:
                 raise DatabaseAbsentEntryError()
 
-        except sql3.Error as exc:
-            raise DatabaseExecutionError(exc) from exc
+        except DuplicateKeyError as exc:
+            raise DatabaseDuplicateEntryError() from exc
 
-        finally:
-            cursor.close()
-
-    def exists(self, patient_id: str) -> bool:
-        cursor = self._get_cursor()
-
-        try:
-            cursor.execute(
-                """
-                    SELECT name FROM patients WHERE id = ?
-                """,
-                (patient_id,)
-            )
-
-            return cursor.fetchone() is not None
-
-        except sql3.Error as exc:
-             raise DatabaseExecutionError(exc) from exc
-
-        finally:
-            cursor.close()
-
-    def commit(self):
-        try:
-            self.connection.commit()
-
-        except sql3.Error as exc:
+        except PyMongoError as exc:
             raise DatabaseExecutionError(exc) from exc
 

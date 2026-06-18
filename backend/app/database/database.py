@@ -1,78 +1,36 @@
 """
 """
 
-import sqlite3 as sql3
-from pathlib import Path
+from pymongo.database import Database as MongoDB
 
 from app.database.exceptions import *
 from app.database.patient_repo import PatientRepository
 from app.database.visit_repo import VisitRepository 
 from app.database.wa_msg_history_repo import WhatsAppMsgHistoryRepository
 from app.database.wa_template_repo import WhatsAppTemplateRepository
+from app.database.client import MongoDBClient
 
 
 class Database:
-    def __init__(self, filepath: Path) -> None:
-        self.filepath = filepath
+    def __init__(self, client: MongoDBClient):
+        self._client = client
 
-        self._connection = None
-        self._patient_repo = None
-        self._visit_repo = None
-        self._wa_msg_history_repo = None
-        self._wa_template_repo = None
+        self._hospital_database = client.get_database("hospital_db")
+        self._whatsapp_database = client.get_database("whatsapp_db")
 
-        try:
-            self._connection = sql3.connect(
-                self.filepath,
-                check_same_thread = False
-            )
-            self._connection.execute(
-                """
-                    PRAGMA foreign_keys = ON
-                """
-            )
-
-        except sql3.Error as exc:
-            raise DatabaseDisconnectedError(exc) from exc
-
-        else:
-            try:
-                self._patient_repo = PatientRepository(self._connection)
-                self._visit_repo = VisitRepository(self._connection)
-                self._wa_msg_history_repo = WhatsAppMsgHistoryRepository(self._connection)
-                self._wa_template_repo = WhatsAppTemplateRepository(self._connection)
-
-            except sql3.Error as exc:
-                self._connection.close()
-                raise DatabaseDisconnectedError(exc) from exc
+        self._patient_repository = PatientRepository(self._hospital_database["patients"])
 
     @property
-    def patient_repo(self) -> PatientRepository:
-        if not self._patient_repo:
-            raise DatabaseDisconnectedError()
-
-        return self._patient_repo
+    def hospital_db(self) -> MongoDB:
+        return self._hospital_database
 
     @property
-    def visit_repo(self) -> VisitRepository:
-        if not self._visit_repo:
-            raise DatabaseDisconnectedError()
-
-        return self._visit_repo
+    def whatsapp_db(self) -> MongoDB:
+        return self._whatsapp_database
 
     @property
-    def wa_msg_history_repo(self) -> WhatsAppMsgHistoryRepository:
-        if not self._wa_msg_history_repo:
-            raise DatabaseDisconnectedError()
-
-        return self._wa_msg_history_repo
-
-    @property
-    def wa_template_repo(self) -> WhatsAppTemplateRepository:
-        if not self._wa_template_repo:
-            raise DatabaseDisconnectedError()
-
-        return self._wa_template_repo
+    def patient_repository(self) -> PatientRepository:
+        return self._patient_repository
 
 database: Database | None = None
 

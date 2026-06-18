@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from urllib.parse import quote_plus
 
 from app.database.database import Database
 import app.database.database as db
@@ -28,12 +29,14 @@ print(get_db_path())
 app = FastAPI(title = "MediSync Backend")
 
 app.add_middleware(
-        CORSMiddleware,
-        allow_origins = ["http://localhost:5173/"],
-        allow_credentials = True,
-        allow_methods = ["*"],
-        allow_headers = ["*"]
-        )
+    CORSMiddleware,
+    allow_origins = [
+        "http://localhost:5173/"
+    ],
+    allow_credentials = True,
+    allow_methods = ["*"],
+    allow_headers = ["*"]
+)
 
 app.include_router(patient_router)
 app.include_router(visit_router)
@@ -44,6 +47,32 @@ visit_manager.visit_manager = VisitManager(db.database)
 
 @app.get("/")
 def root():
-    return {"status": "MediSync backend is running"}
+    return {
+        "status": "MediSync backend is running"
+    }
 
+
+from pymongo import MongoClient
+from pymongo.server_api import ServerApi
+
+username = "ArnavVinayakDeshpande"
+password = quote_plus("N4v1n4t10n69@1101")
+
+uri = "mongodb+srv://ArnavVinayakDeshpande:N4v1n4t10n69@1101@lenestdevcluster.ws1ommw.mongodb.net/?appName=LenestDevCluster"
+
+uri = (
+    f"mongodb+srv://{username}:{password}"
+    "@lenestdevcluster.ws1ommw.mongodb.net/"
+    "?appName=LenestDevCluster"
+)
+
+# Create a new client and connect to the server
+client = MongoClient(uri, server_api=ServerApi('1'))
+
+# Send a ping to confirm a successful connection
+try:
+    client.admin.command('ping')
+    print("Pinged your deployment. You successfully connected to MongoDB!")
+except Exception as e:
+    print(e)
 

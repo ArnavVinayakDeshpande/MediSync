@@ -12,3 +12,6 @@ data/lenest_database.db
 # Pyright
 pyrightconfig.json
 
+# env
+backend/.env
+

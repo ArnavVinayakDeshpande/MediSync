@@ -2,14 +2,23 @@
 """
 
 from sqlite3 import Error as SqliteError
+from pymongo.errors import PyMongoError
 
+
+type InternalDatabaseError = SqliteError | PyMongoError
+
+class DatabaseConfigurationError(Exception):
+    _MESSAGE = "Invalid configuration given to database: {msg}"
+
+    def __init__(self, message: str):
+        super().__init__(self._MESSAGE.format(msg = message))
 
 class DatabaseDisconnectedError(Exception):
     """Raised when a connection to the database cannot be established."""
 
     _MESSAGE = "Failed to establish a connection to the database."
 
-    def __init__(self, exc: Exception | None = None):
+    def __init__(self, exc: InternalDatabaseError | None = None):
         if exc is None:
             super().__init__(self._MESSAGE)
         else:
@@ -18,7 +27,7 @@ class DatabaseDisconnectedError(Exception):
 class DatabaseCursorError(Exception):
     _MESSAGE = "Failed to create database cursor: {exc}"
 
-    def __init__(self, exc: SqliteError):
+    def __init__(self, exc: InternalDatabaseError):
         super().__init__(self._MESSAGE.format(exc=exc))
 
 class DatabaseExecutionError(Exception):
@@ -26,8 +35,8 @@ class DatabaseExecutionError(Exception):
 
     _MESSAGE = "Database operation failed: {exc}"
 
-    def __init__(self, sql_error: SqliteError):
-        super().__init__(self._MESSAGE.format(exc=sql_error))
+    def __init__(self, exc: InternalDatabaseError):
+        super().__init__(self._MESSAGE.format(exc = exc))
 
 
 class DatabaseDuplicateEntryError(Exception):

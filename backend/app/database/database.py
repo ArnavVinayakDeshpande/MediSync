@@ -12,13 +12,14 @@ from app.database.client import MongoDBClient
 
 
 class Database:
-    def __init__(self, client: MongoDBClient):
+    def __init__(self, client: MongoDBClient) -> None:
         self._client = client
 
         self._hospital_database = client.get_database("hospital_db")
         self._whatsapp_database = client.get_database("whatsapp_db")
 
         self._patient_repository = PatientRepository(self._hospital_database["patients"])
+        self._visit_repository = VisitRepository(self._hospital_database["visits"])
 
     @property
     def hospital_db(self) -> MongoDB:

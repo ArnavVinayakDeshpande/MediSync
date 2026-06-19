@@ -2,6 +2,7 @@
 """
 
 from datetime import date
+from dataclasses import dataclass
 from pymongo.collection import Collection
 from pymongo.errors import (
     PyMongoError,
@@ -20,7 +21,14 @@ from app.common.converter import (
 )
 
 
-type PatientRepositoryGetFieldsResult = dict[str, str | date | MedicalCondition | bool] | None
+@dataclass
+class PatientRepositoryGetFieldsResult:
+    id: str
+    name: str | None
+    dob: date | None
+    number: str | None
+    condition: MedicalCondition | None
+    is_active: bool | None
 
 class PatientRepository:
     def __init__(self, collection: Collection) -> None:
@@ -156,7 +164,7 @@ class PatientRepository:
         number: bool = False,
         condition: bool = False,
         is_active: bool = False
-    ) -> PatientRepositoryGetFieldsResult:
+    ) -> PatientRepositoryGetFieldsResult | None:
         if not patient_id:
             return None
 
@@ -181,16 +189,14 @@ class PatientRepository:
             if result is None:
                 return None
 
-            if dob:
-                result["dob"] = date_from_db_fmt(result["dob"])
-
-            if condition:
-                result["condition"] = MedicalCondition(result["condition"])
-
-            if is_active:
-                result["is_active"] = bool(result["is_active"])
-
-            return result
+            return PatientRepositoryGetFieldsResult(
+                id = patient_id,
+                name = result["name"] if name else None,
+                dob = date_from_db_fmt(result["date"]) if dob else None,
+                number = result["number"] if number else None,
+                condition = MedicalCondition(result["condition"]) if condition else None,
+                is_active = bool(result["is_active"]) if is_active else None
+            )
 
         except PyMongoError as exc:
             raise DatabaseExecutionError(exc) from exc

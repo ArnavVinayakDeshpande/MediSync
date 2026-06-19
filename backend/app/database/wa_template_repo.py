@@ -1,9 +1,14 @@
 """
+
 """
 
-import sqlite3 as sql3
-from datetime import datetime
-import json
+from datetime import date, datetime
+from dataclasses import dataclass
+from pymongo.collection import Collection
+from pymongo.errors import (
+    PyMongoError,
+    DuplicateKeyError   
+)
 
 from app.database.exceptions import *
 from app.communication.whatsapp.template import (
@@ -14,336 +19,304 @@ from app.communication.whatsapp.template import (
     WhatsAppTemplate
 )
 from app.common.converter import (
-    date_to_db_fmt,
-    date_from_db_fmt
+    datetime_to_db_fmt,
+    datetime_from_db_fmt,
+    date_to_datetime_range,
+    whatsapp_template_to_db_fmt,
+    whatsapp_template_from_db_fmt
 )
 
 
+@dataclass
+class WhatsAppTemplateRepositoryGetFieldsResult:
+    id: str 
+    name: str | None
+    meta_id: str | None
+    language: WhatsAppTemplateLanguage | None
+    category: WhatsAppTemplateCategory | None
+    body: str | None
+    header: str | None
+    footer: str | None
+    approval_status: WhatsAppTemplateApprovalStatus | None
+    status: WhatsAppTemplateStatus | None
+    created_on: datetime | None
+    variables: list[str] | None
+
 class WhatsAppTemplateRepository:
-    def __init__(self, connection: sql3.Connection):
-        self.connection = connection
+    def __init__(self, collection: Collection) -> None:
+        self._collection = collection
 
-        self._ensure_initialized()
+        # Create the indices
+        self._collection.create_index(
+            "id",
+            unique = True
+        )
 
-    def _get_cursor(self) -> sql3.Cursor:
-        try:
-            return self.connection.cursor()
+        self._collection.create_index(
+            [
+                "name", "language"
+            ],
+            unique = True
+        )
 
-        except sql3.Error as exc:
-            raise DatabaseCursorError(exc) from exc
-        
-    def _ensure_initialized(self):
-        cursor = self._get_cursor()
-
-        try:
-            cursor.execute(
-                """
-                    CREATE TABLE IF NOT EXISTS
-                        wa_templates (
-                            id TEXT PRIMARY KEY NOT NULL,
-                            name TEXT NOT NULL,
-                            meta_id TEXT UNIQUE,
-                            language TEXT,
-                            category TEXT NOT NULL,
-                            body TEXT NOT NULL,
-                            header TEXT,
-                            footer TEXT,
-                            approval_status TEXT NOT NULL,
-                            status TEXT,
-                            approved_on TEXT,
-                            created_on TEXT NOT NULL,
-                            variables TEXT NOT NULL
-                        )
-                """
-            )
-
-            self.commit()
-
-        except sql3.Error as exc:
-            raise DatabaseExecutionError(exc) from exc
-
-        finally:
-            cursor.close()
-
-    def _create_template(self, data) -> WhatsAppTemplate:
-        try:
-            return WhatsAppTemplate(
-                id = data[0],
-                name = data[1],
-                meta_id = data[2],
-                language = WhatsAppTemplateLanguage(data[3]),
-                category = WhatsAppTemplateCategory(data[4]),
-                body = data[5],
-                header = data[6],
-                footer = data[7],
-                approval_status = WhatsAppTemplateApprovalStatus(data[8]),
-                status = WhatsAppTemplateStatus(data[9]),
-                approved_on = date_from_db_fmt(data[10]),
-                created_on = date_from_db_fmt(data[11]),
-                variables = json.loads(data[12])
-            )
-
-        except Exception as exc:
-            raise DatabaseParsingError(exc) from exc
+        self._collection.create_index(
+            "meta_id",
+            unique = True
+        )
 
     def insert(
         self,
         template: WhatsAppTemplate
-    ):
-        template.validate()
-
-        cursor = self._get_cursor()
-        
+    ) -> None:
         try:
-            cursor.execute(
-                """
-                    INSERT INTO 
-                        wa_templates (
-                            id,
-                            name,
-                            meta_id,
-                            language,
-                            category,
-                            body,
-                            header,
-                            footer,
-                            approval_status,
-                            status,
-                            approved_on,
-                            created_on,
-                            variables,
-                        )
-                    VALUES (
-                        ?, ?, ?,
-                        ?, ?, ?,
-                        ?, ?, ?,
-                        ?, ?, ?,
-                        ?
-                    )
-
-                """,
-                (
-                    template.id,
-                    template.name,
-                    template.meta_id,
-                    template.language.value,
-                    template.category.value,
-                    template.body,
-                    template.header,
-                    template.footer,
-                    template.approval_status.value,
-                    template.status.value,
-                    date_to_db_fmt(template.approved_on),
-                    date_to_db_fmt(template.created_on),
-                    json.dumps(template.variables)
-                )
+            self._collection.insert_one(
+                document = whatsapp_template_to_db_fmt(template)
             )
 
-        except sql3.Error as exc:
+        except DuplicateKeyError as exc:
+            raise DatabaseDuplicateEntryError() from exc
+
+        except PyMongoError as exc:
             raise DatabaseExecutionError(exc) from exc
 
-        finally:
-            cursor.close()
-
-    def delete(
-        self,
-        template_id: str
-    ):
-        cursor = self._get_cursor()
-
+    def delete(self, template_id: str) -> None:
         try:
-            cursor.execute(
-                """
-                    DELETE FROM wa_templates
-                    WHERE id = ?
-                """,
-                (template_id,)
+            result = self._collection.delete_one(
+                filter = {
+                    "id": template_id
+                }
             )
 
-            if cursor.rowcount == 0:
+            if result.deleted_count == 0:
                 raise DatabaseAbsentEntryError()
 
-        except sql3.Error as exc:
+        except PyMongoError as exc:
             raise DatabaseExecutionError(exc) from exc
 
-        finally:
-            cursor.close()
+    def delete_by_meta_id(self, meta_id: str) -> None:
+        try:
+            result = self._collection.delete_one(
+                filter = {
+                    "meta_id": meta_id
+                }
+            )
+
+            if result.deleted_count == 0:
+                raise DatabaseAbsentEntryError()
+
+        except PyMongoError as exc:
+            raise DatabaseExecutionError(exc) from exc
 
     def delete_by_name(
         self,
-        template_name: str,
-        template_language: WhatsAppTemplateLanguage | None
-    ):
-        cursor = self._get_cursor()
-
-        query = "DELETE FROM wa_templates WHERE name = ?"
-        parameters = [template_name]
-
-        if template_language is not None:
-            query += " AND language = ? "
-            parameters.append(template_language.value)
-
+        name: str,
+        language: WhatsAppTemplateLanguage | None = None
+    ) -> None:
         try:
-            cursor.exceute(
-                query,
-                parameters
+            result = self._collection.delete_one(
+                filter = {
+                    "name": name,
+                    **({"language": language.value} if language is not None else {})
+                }
             )
 
-        except sql3.Error as exc:
-            raise DatabaseExecutionError(exc) from exc
+            if result.deleted_count == 0:
+                raise DatabaseAbsentEntryError()
 
-        finally:
-            cursor.close()
+        except PyMongoError as exc:
+            raise DatabaseExecutionError(exc) from exc
 
     def get(
-        self, 
+        self,
         template_id: str
     ) -> WhatsAppTemplate | None:
-        cursor = self._get_cursor()
-        
         try:
-            cursor.exceute(
-                """
-                    SELECT * FROM wa_templates WHERE id = ?
-                """,
-                (template_id, )
+            template = self._collection.find_one(
+                {
+                    "id": template_id
+                }       
             )
 
-            data = cursor.fetchone()
+            if template is None:
+                return None
 
-            return self._create_template(data) if data is not None else None
+            return whatsapp_template_from_db_fmt(template)
 
-        except sql3.Error as exc:
+        except PyMongoError as exc:
             raise DatabaseExecutionError(exc) from exc
 
-        finally:
-            cursor.close()
+    def get_by_meta_id(
+        self,
+        meta_id: str
+    ) -> WhatsAppTemplate | None:
+        try:
+            template = self._collection.find_one(
+                {
+                    "meta_id": meta_id
+                }
+            )
+
+            if template is None:
+                return None
+
+            return whatsapp_template_from_db_fmt(template)
+
+        except PyMongoError as exc:
+            raise DatabaseExecutionError(exc) from exc
+
+    def get_by_name(
+        self,
+        name: str,
+        language: WhatsAppTemplateLanguage | None = None
+    ) -> WhatsAppTemplate | None:
+        try:
+            template= self._collection.find_one(
+                {
+                    "name": name,
+                    **({"language": language.value} if language is not None else {})
+                }
+            )
+
+            if template is None:
+                return None
+
+            return whatsapp_template_from_db_fmt(template)
+
+        except PyMongoError as exc:
+            raise DatabaseExecutionError(exc) from exc
 
     def getall(
         self,
-        template_name: str | None,
-        template_language: WhatsAppTemplateLanguage | None
+        size: int = 0,
+        offset: int = 0,
+        name: str | None = None,
+        language: WhatsAppTemplateLanguage | None = None,
+        category: WhatsAppTemplateCategory | None = None,
+        has_header: bool | None = None,
+        has_footer: bool | None = None,
+        approval_status: WhatsAppTemplateApprovalStatus | None = None,
+        status: WhatsAppTemplateStatus | None = None, # TODO Figure out how to query for 'None' status.
+        is_approved: bool | None = None,
+        created_on: date | None = None,
+        has_variables: bool | None = None
     ) -> list[WhatsAppTemplate]:
-        cursor = self._get_cursor() 
+        co_start, co_end = None, None
 
-        query = "SELECT * FROM wa_templates"
-        parameters = []
-
-        if template_name:
-            query += " WHERE name = ?"
-            parameters.append(template_name)
-
-            if template_language:
-                query += " AND language = ?"
-                parameters.append(template_language.value)
-
-        else:
-            if template_language:
-                query += " WHERE language = ?"
-                parameters.append(template_language.value)
-        
-        try:
-            cursor.execute(
-                query,
-                parameters
+        if created_on is not None:
+            created_on_start, created_on_end = date_to_datetime_range(
+                created_on
             )
 
-            data = cursor.fetchall()
+            co_start = datetime_to_db_fmt(created_on_start)
+            co_end = datetime_to_db_fmt(created_on_end)
 
-            return [self._create_template(d) for d in data]
+        try:
+            result = (
+                self._collection.find(
+                    {
+                        **({"name": name} if name else {}),
+                        **({"language": language.value} if language is not None else {}),
+                        **({"category": category.value} if category is not None else {}),
+                        **({"header": {"$ne": None} if has_header else None} if has_header is not None else {}),
+                        **({"footer": {"$ne": None} if has_footer else None} if has_footer is not None else {}),
+                        **({"approval_status": approval_status.value} if approval_status is not None else {}),
+                        **({"status": status.value} if status is not None else {}),
+                        **({"approval_status": WhatsAppTemplateApprovalStatus.APPROVED if is_approved else {"$ne": WhatsAppTemplateApprovalStatus.APPROVED}} if is_approved is not None else {}),
+                        **({"created_on": {"$gte": co_start, "$lt": co_end}} if created_on is not None else {}),
+                        **({"variables": {"$ne": []} if has_variables else []} if has_variables is not None else {})
+                        
+                    }
+                )
+                .sort(
+                    [
+                        ("name", 1),
+                        ("language", 1),
+                        ("id", 1)
+                    ]
+                )
+                .skip(offset)
+                .limit(size)
+            )
 
-        except sql3.Error as exc:
+            return [
+                whatsapp_template_from_db_fmt(res)
+                for res in result
+            ]
+
+        except PyMongoError as exc:
             raise DatabaseExecutionError(exc) from exc
 
-        finally:
-            cursor.close()
-
-    def update(
+    def getfields(
         self,
         template_id: str,
-        set_header: bool = False,
-        set_footer: bool = False,
-        set_status: bool = False,
-        set_approved_on: bool = False,
-        set_approval_status: bool = False,
-        header: str | None = None,
-        footer: str | None = None,
-        approval_status: WhatsAppTemplateApprovalStatus | None = None,
-        status: WhatsAppTemplateStatus | None = None,
-        approved_on: datetime | None = None
-    ):
-        cursor = self._get_cursor()
-
-        if (
-            not set_header and
-            not set_footer and
-            not set_status and
-            not set_approved_on and
-            not set_approval_status
-        ):
-            return  # No changes
-
-        query = "UPDATE wa_templates SET"
-        parameters = []
-
+        name: bool = False,
+        meta_id: bool = False,
+        language: bool = False,
+        category: bool = False,
+        body: bool = False,
+        header: bool = False,
+        footer: bool = False,
+        approval_status: bool = False,
+        status: bool = False,
+        created_on: bool = False,
+        variables: bool = False
+    ) -> WhatsAppTemplateRepositoryGetFieldsResult | None:
         try:
-            first = True
+            result = self._collection.find_one(
+                {
+                    "id": template_id
+                },
+                {
+                    "_id": 0,
+                    "name": int(name),
+                    "meta_id": int(meta_id),
+                    "language": int(language),
+                    "category": int(category),
+                    "body": int(body),
+                    "header": int(header),
+                    "footer": int(footer),
+                    "approval_status": int(approval_status),
+                    "status": int(status),
+                    "created_on": int(created_on),
+                    "variables": int(variables)
+                }
+            )
 
-            if set_header:
-                if not first:
-                    query += ","
-                query += " header = ?"
-                parameters.append(header)
-                first = False
+            return WhatsAppTemplateRepositoryGetFieldsResult(
+                id = template_id,
+                name = result["name"] if name else None,
+                meta_id = result["meta_id"] if meta_id else None,
+                language = WhatsAppTemplateLanguage(result["language"]) if language else None,
+                category = WhatsAppTemplateCategory(result["category"]) if category else None,
+                body = result["body"] if body else None,
+                header = result["header"] if header else None,
+                footer = result["footer"] if footer else None,
+                approval_status = WhatsAppTemplateApprovalStatus(result["approval_status"]) if approval_status else None,
+                status = WhatsAppTemplateStatus(result["status"]) if status and result["status"] is not None else None,
+                created_on = datetime_from_db_fmt(result["created_on"]) if created_on else None,
+                variables = result["variables"] if variables else None
+            ) if result else None
 
-            if set_footer:
-                if not first:
-                    query += ","
-                query += " footer = ?"
-                parameters.append(footer)
-                first = False
-
-            if set_status:
-                if not first:
-                    query += ","
-                query += " status = ?"
-                parameters.append(status.value if status is not None else None)
-                first = False
-
-            if set_approval_status:
-                if not first:
-                    query += ","
-                query += " approval_status = ?"
-                parameters.append(
-                    approval_status.value if approval_status is not None else None
-                )
-                first = False
-
-            if set_approved_on:
-                if not first:
-                    query += ","
-                query += " approved_on = ?"
-                parameters.append(date_to_db_fmt(approved_on))
-                first = False
-
-            query += " WHERE id = ?"
-            parameters.append(template_id)
-
-            cursor.execute(query, parameters)
-
-            if cursor.rowcount == 0:
-                raise DatabaseAbsentEntryError()
-
-        except sql3.Error as exc:
+        except PyMongoError as exc:
             raise DatabaseExecutionError(exc) from exc
 
-        finally:
-            cursor.close()
-
-    def commit(self):
+    def getid(self, meta_id: str) -> str | None:
         try:
-            self.connection.commit()
+            result = self._collection.find_one(
+                {
+                    "meta_id": meta_id
+                },
+                {
+                    "_id": 0,
+                    "id": 1
+                }
+            )
 
-        except sql3.Error as exc:
+            return result["id"] if result is not None else None
+
+        except PyMongoError as exc:
             raise DatabaseExecutionError(exc) from exc
+
+    def update(self):
+        pass
 

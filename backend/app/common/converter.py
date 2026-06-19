@@ -120,6 +120,40 @@ def whatsapp_message_from_db_fmt(message: dict) -> WhatsAppMessage:
         parameters = message["parameters"]
     )
 
+def whatsapp_template_to_db_fmt(template: WhatsAppTemplate) -> dict:
+    return {
+        "id": template.id,
+        "name": template.name,
+        "meta_id": template.meta_id,
+        "language": template.language.value,
+        "category": template.category.value,
+        "body": template.body,
+        "header": template.header,
+        "footer": template.footer,
+        "approval_status": template.approval_status.value,
+        "status": template.status.value if template.status else None,
+        "approved_on": datetime_to_db_fmt(template.approved_on),
+        "created_on": datetime_to_db_fmt(template.created_on),
+        "variables": template.variables
+    }
+
+def whatsapp_template_from_db_fmt(template: dict) -> WhatsAppTemplate:
+    return WhatsAppTemplate(
+        id = template["id"],
+        name = template["name"],
+        meta_id = template["meta_id"],
+        language = WhatsAppTemplateLanguage(template["language"]),
+        category = WhatsAppTemplateCategory(template["category"]),
+        body = template["body"],
+        header = template["header"],
+        footer = template["footer"],
+        approval_status = WhatsAppTemplateApprovalStatus(template["approval_status"]),
+        status = WhatsAppTemplateStatus(template["status"]) if template["status"] is not None else None,
+        approved_on = datetime_from_db_fmt(template["approved_on"]),
+        created_on = datetime_from_db_fmt(template["created_on"]), # pyright: ignore
+        variables = template["variables"]
+    )
+
 # JSON
 def date_to_json_fmt(dt: date | None) -> str | None:
     return dt.strftime("%d-%m-%Y") if dt else None

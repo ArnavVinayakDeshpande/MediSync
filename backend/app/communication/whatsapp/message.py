@@ -86,7 +86,7 @@ class WhatsAppMessage:
                 raise WhatsAppInvalidInputsError("WhatsApp Message: no template id given in templated message.")
 
             if not self.language:
-                raise WhatsappInvalidInputsError("WhatsApp Mesage: no language given in templated message.")
+                raise WhatsAppInvalidInputsError("WhatsApp Mesage: no language given in templated message.")
 
             if self.text:
                 raise WhatsAppInvalidInputsError("WhatsApp Message: text given in templated message.")

@@ -1,327 +1,149 @@
 """
+
 """
 
-import sqlite3 as sql3
-import json
-from datetime import datetime
+from datetime import datetime, date
+from pymongo.collection import Collection
+from pymongo.errors import (
+    PyMongoError,
+    DuplicateKeyError
+)
 
 from app.database.exceptions import *
-from app.communication.whatsapp.message import *
-from app.communication.whatsapp.template import *
-from app.common.converter import *
+from app.communication.whatsapp.message import (
+    WhatsAppMessageType,
+    WhatsAppMessageStatus,
+    WhatsAppMessage
+)
+from app.communication.whatsapp.template import (
+    WhatsAppTemplateLanguage,
+    WhatsAppTemplateCategory
+)
+from app.common.converter import (
+    datetime_to_db_fmt,
+    datetime_from_db_fmt,
+    date_to_datetime_range,
+    whatsapp_message_to_db_fmt,
+    whatsapp_message_from_db_fmt
+)
 
 
-class WhatsAppMsgHistoryRepository:
-    def __init__(self, connection: sql3.Connection):
-        self.connection = connection
+class WhatsAppMessageHistoryRepository:
+    def __init__(self, collection: Collection) -> None:
+        self._collection = collection
 
-        self._ensure_initialized()
+        # Create the indices
+        self._collection.create_index(
+            "id",
+            unique = True
+        )
 
-    def _get_cursor(self) -> sql3.Cursor:
-        try:
-            return self.connection.cursor()
+        self._collection.create_index(
+            "whatsapp_id",
+            unique = True
+        )
 
-        except sql3.Error as exc:
-            raise DatabaseCursorError(exc) from exc
-
-    def _ensure_initialized(self):
-        cursor = self._get_cursor()
-
-        try:
-            cursor.execute(
-                """
-                    CREATE TABLE IF NOT EXISTS
-                        wa_message_history (
-                            id TEXT PRIMARY KEY NOT NULL,
-                            whatsapp_id TEXT UNIQUE,
-                            msg_type TEXT NOT NULL,
-                            recipient_number TEXT NOT NULL,
-                            template_name TEXT,
-                            template_id TEXT,
-                            msg_text TEXT,
-                            language TEXT,
-                            sent_on TEXT,
-                            delivered_on TEXT,
-                            read_on TEXT,
-                            created_on TEXT NOT NULL,
-                            parameters TEXT NOT NULL
-                        )
-                """
-                    )
-
-            self.commit()
-
-        except sql3.Error as exc:
-            raise DatabaseExecutionError(exc) from exc
-
-        finally:
-            cursor.close()
-
-    def _create_message(self, data: tuple) -> WhatsAppMessage:
-        try:
-            return WhatsAppMessage(
-                    id = data[0],
-                    whatsapp_id = data[1],
-                    msg_type = WhatsAppMessageType(data[2]),
-                    recipient_number = data[3],
-                    template_name = data[4],
-                    template_id = data[5],
-                    text = data[6],
-                    language = WhatsAppTemplateLanguage(data[7]) if data[7] is not None else None,
-                    sent_on = date_from_db_fmt(data[8]),
-                    delivered_on = date_from_db_fmt(data[9]),
-                    read_on = date_from_db_fmt(data[10]),
-                    created_on = date_from_db_fmt(data[11]),
-                    parameters = json.loads(data[12])
-                    )
-
-        except Exception as exc:
-            raise DatabaseParsingError(exc) from exc
+    @property
+    def collection(self) -> Collection:
+        return self._collection
 
     def insert(
-            self,
-            message: WhatsAppMessage
-        ):
-        cursor = self._get_cursor() 
-
+        self,
+        message: WhatsAppMessage
+    ) -> None:
         try:
-            cursor.execute(
-                    """
-                    INSERT INTO 
-                        wa_message_history (
-                            id,
-                            whatsapp_id,
-                            msg_type,
-                            recipient_number,
-                            template_name,
-                            template_id,
-                            msg_text,
-                            language,
-                            sent_on,
-                            delivered_on,
-                            read_on,
-                            created_on,
-                            parameters
-                            )
-                    VALUES
-                        (
-                            ?, ?, ?,
-                            ?, ?, ?,
-                            ?, ?, ?,
-                            ?, ?, ?,
-                            ?
-                        )
-                    """,
-                    (
-                        message.id,
-                        message.whatsapp_id,
-                        message.msg_type,
-                        message.recipient_number,
-                        message.template_name,
-                        message.template_id,
-                        message.text,
-                        message.language if message.language else None,
-                        date_to_db_fmt(message.sent_on),
-                        date_to_db_fmt(message.delivered_on),
-                        date_to_db_fmt(message.read_on),
-                        date_to_db_fmt(message.created_on),
-                        json.dumps(message.parameters)
-                    )
-                    )
+            self._collection.insert_one(
+                document = whatsapp_message_to_db_fmt(message)
+            )
+            
+        except DuplicateKeyError as exc:
+            raise DatabaseDuplicateEntryError() from exc
 
-        except sql3.Error as exc:
+        except PyMongoError as exc:
             raise DatabaseExecutionError(exc) from exc
 
-        finally:
-            cursor.close()
-
-    def delete(self, message_id: str):
-        cursor = self._get_cursor()
-
+    def delete(self, message_id: str) -> None:
         try:
-            cursor.execute(
-                    """
-                    DELETE FROM wa_message_history WHERE id = ?
-                    """,
-                    (message_id,)
-                )
+            result = self._collection.delete_one(
+                filter = {
+                    "id": message_id
+                }
+            )
 
-            if cursor.rowcount == 0:
+            if result.deleted_count == 0:
                 raise DatabaseAbsentEntryError()
-
-        except sql3.Error as exc:
+        
+        except PyMongoError as exc:
             raise DatabaseExecutionError(exc) from exc
-
-        finally:
-            cursor.close()
 
     def get(self, message_id: str) -> WhatsAppMessage | None:
-        cursor = self._get_cursor()
-
         try:
-            cursor.execute(
-                    """
-                    SELECT * FROM wa_message_history WHERE id = ?
-                    """,
-                    (message_id,)
-                    )
+            message = self._collection.find_one(
+                filter = {
+                    "id": message_id
+                }
+            )
 
-            data = cursor.fetchone()
+            return whatsapp_message_from_db_fmt(message) if message else None
 
-            if data is None:
-                return None
-
-            return self._create_message(data)
-
-        except sql3.Error as exc:
+        except PyMongoError as exc:
             raise DatabaseExecutionError(exc) from exc
-
-        finally:
-            cursor.close()
-
-    def get_by_whatsapp_id(self, whatsapp_id: str) -> WhatsAppMessage | None:
-        cursor = self._get_cursor()
-
-        try:
-            cursor.execute(
-                    """
-                    SELECT * FROM wa_message_history WHERE whatsapp_id = ?
-                    """,
-                    (whatsapp_id,)
-                    )
-
-            data = cursor.fetchone()
-
-            if data is None:
-                return None
-
-            return self._create_message(data)
-
-        except sql3.Error as exc:
-            raise DatabaseExecutionError(exc) from exc
-
-        finally:
-            cursor.close()
-
-    def get_id_from_whatsapp_id(self, whatsapp_id: str) -> str | None:
-        cursor = self._get_cursor()
-
-        try:
-            cursor.execute(
-                    """
-                    SELECT id FROM wa_message_history WHERE whatsapp_id = ?
-                    """,
-                    (whatsapp_id,)
-                    )
-
-            data = cursor.fetchone()
-
-            return data[0] if data is not None else None
-
-        except sql3.Error as exc:
-            raise DatabaseExecutionError(exc) from exc
-
-        finally:
-            cursor.close()
-
-    def get_whatsapp_id_from_id(self, id: str) -> str | None:
-        cursor = self._get_cursor()
-
-        try:
-            cursor.execute(
-                    """
-                    SELECT whatsapp_id FROM wa_message_history WHERE id = ?
-                    """,
-                    (id,)
-                    )
-
-            data = cursor.fetchone()
-
-            return data[0] if data is not None else None
             
-        except sql3.Error as exc:
-            raise DatabaseExecutionError(exc) from exc
+    def getall(
+        self,
+        size: int = 0,
+        offset: int = 0,
+        msg_type: WhatsAppMessageType | None = None,
+        recipient_number: str | None = None,
+        template_name: str | None = None,
+        template_id: str | None = None,
+        language: WhatsAppTemplateLanguage | None = None,
+        sent_on: date | None = None,
+        created_on: date | None = None
+    ) -> list[WhatsAppMessage]:
+        so_start = None
+        so_end = None
+        co_start = None
+        co_end = None
 
-        finally:
-            cursor.close()
-        
-    def getall(self) -> list[WhatsAppMessage]:
-        cursor = self._get_cursor()
+        if sent_on is not None:
+           sent_on_start, sent_on_end = date_to_datetime_range(sent_on) 
+           so_start = datetime_to_db_fmt(sent_on_start)
+           so_end = datetime_to_db_fmt(sent_on_end)
 
-        try:
-            cursor.execute(
-                    """
-                    SELECT * FROM wa_message_history
-                    """
-                    )
-
-            data = cursor.fetchall()
-
-            return [self._create_message(d) for d in data]
-
-        except sql3.Error as exc:
-            raise DatabaseExecutionError(exc) from exc
-
-        finally:
-            cursor.close()
-
-    def update(
-            self, 
-            message_id: str,
-            set_sent_date: bool = False,
-            set_delivered_date: bool = False,
-            set_read_date: bool = False,
-            sent_date: datetime | None = None,
-            delivered_date: datetime | None = None,
-            read_date: datetime | None = None
-        ):
-        if (
-                not set_sent_date and
-                not set_delivered_date and
-                not set_read_date
-            ):
-            return
-
-        cursor = self._get_cursor()
-
-        query = "UPDATE wa_message_history SET"
-
-        parameters = []
+        if created_on is not None:
+            created_on_start, created_on_end = date_to_datetime_range(created_on)
+            co_start = datetime_to_db_fmt(created_on_start)
+            co_end = datetime_to_db_fmt(created_on_end)
 
         try:
-            if set_sent_date:
-                query += " sent_on = ?"
-                parameters.append(date_to_db_fmt(sent_date))
+            result = (
+                self._collection
+                .find(
+                    {
+                        **({"msg_type": msg_type.value} if msg_type is not None else {}),
+                        **({"recipient_number": recipient_number} if recipient_number else {}),
+                        **({"template.name": template_name} if template_name else {}),
+                        **({"template.id": template_id} if template_id else {}),
+                        **({"language": language.value} if language is not None else {}),
+                        **({"sent_on": {"$gte": so_start, "$lt": so_end}} if sent_on is not None else {}),
+                        **({"created_on": {"$gte": co_start, "$lt": co_end}} if created_on is not None else {})
+                    }
+                )
+                .sort(
+                    [
+                        ("created_on", -1),
+                        ("id", 1)
+                    ]
+                )
+                .skip(offset)
+                .limit(size)
+            )
 
-            if set_delivered_date:
-                query += ", delivered_on = ?"
-                parameters.append(date_to_db_fmt(delivered_date))
+            return [
+                whatsapp_message_from_db_fmt(res) for res in result
+            ]
 
-            if set_read_date:
-                query += ", read_on = ?"
-                parameters.append(date_to_db_fmt(read_date))
-
-            query += " WHERE id = ?"
-            parameters.append(message_id)
-
-            cursor.execute(
-                    query,
-                    parameters
-                    )
-
-            if cursor.rowcount == 0:
-                raise DatabaseAbsentEntryError()
-
-        except sql3.Error as exc:
-            raise DatabaseExecutionError(exc) from exc
-        
-        finally:
-            cursor.close()
-
-    def commit(self):
-        try:
-            self.connection.commit()
-
-        except sql3.Error as exc:
+        except PyMongoError as exc:
             raise DatabaseExecutionError(exc) from exc
 

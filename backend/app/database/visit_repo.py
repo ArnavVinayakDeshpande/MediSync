@@ -19,12 +19,22 @@ from app.common.converter import (
 )
 
 
-type VisitRepositoryGetFieldsResult = dict[str, str | _date | float] | None
-
 @dataclass
 class VisitRepositoryGetResult:
     patient_id: str
     visit: Visit
+
+@dataclass
+class VisitRepositoryGetFieldsResult:
+    id: str
+    patient_id: str | None = None
+    date: _date | None = None
+    diagnosis: str | None = None
+    prescription: str | None = None
+    notes: str | None = None
+    fees_paid: float | None = None
+    fees_pending: float | None = None
+    follow_up_date: _date | None = None
 
 class VisitRepository:
     def __init__(self, collection: Collection) -> None:
@@ -175,7 +185,7 @@ class VisitRepository:
         fees_paid: bool = False,
         fees_pending: bool = False,
         follow_up_date: bool = False
-    ) -> VisitRepositoryGetFieldsResult:
+    ) -> VisitRepositoryGetFieldsResult | None:
         if not visit_id:
             return None
     
@@ -209,7 +219,16 @@ class VisitRepository:
             if follow_up_date:
                 result["follow_up_date"] = date_from_db_fmt(result["follow_up_date"])
 
-            return result
+            return VisitRepositoryGetFieldsResult(
+                id = visit_id,
+                patient_id = result["pid"] if patient_id else None,
+                date = date_from_db_fmt(result["date"]) if date else None,
+                diagnosis = result["diagnosis"] if diagnosis else None,
+                prescription = result["prescription"] if diagnosis else None,
+                notes = result["notes"] if notes else None,
+                fees_paid = result["fees_paid"] if fees_paid else None,
+                follow_up_date = date_from_db_fmt(result["follow_up_date"]) if follow_up_date else None
+            )
 
         except PyMongoError as exc:
             raise DatabaseExecutionError(exc) from exc

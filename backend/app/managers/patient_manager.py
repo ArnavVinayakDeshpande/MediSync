@@ -2,6 +2,7 @@
 """
 
 from datetime import date
+from dataclasses import dataclass
 
 from app.common.id_creater import generate_id
 from app.database.database import Database
@@ -11,6 +12,15 @@ from app.models.patient import Patient
 from app.models.medical_condition import MedicalCondition
 from .exceptions import *
 
+
+@dataclass
+class PatientManagerGetFieldsResult:
+    id: str
+    name: str | None
+    dob: date | None
+    number: str | None
+    condition: MedicalCondition | None
+    is_active: bool | None
 
 class PatientManager:
     def __init__(self, database: Database):
@@ -121,6 +131,43 @@ class PatientManager:
     def getid(self, patient_name: str) -> str | None:
         try:
             return self._repo.getid(patient_name)
+
+        except (DatabaseCursorError, DatabaseExecutionError) as exc:
+            raise PMDatabaseError(exc) from exc
+
+    def getfields(
+        self,
+        patient_id: str,
+        name: bool = False,
+        dob: bool = False,
+        number: bool = False,
+        condition: bool = False,
+        is_active: bool = False
+    ) -> PatientManagerGetFieldsResult | None:
+        if not patient_id:
+            return None
+
+        try:
+            data = self._repo.getfields(
+                patient_id = patient_id,
+                name = name,
+                dob = dob,
+                number = number,
+                condition = condition,
+                is_active = is_active
+            )
+
+            if data is None:
+                return None
+
+            return PatientManagerGetFieldsResult(
+                id = data.id,
+                name = data.name,
+                dob = data.dob,
+                number = data.number,
+                condition = data.condition,
+                is_active = data.is_active
+            )
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
             raise PMDatabaseError(exc) from exc

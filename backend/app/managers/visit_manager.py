@@ -17,12 +17,24 @@ class VisitManagerGetResult:
     visit: Visit
     patient_id: str
 
+@dataclass
+class VisitManagerGetFieldsResult:
+    id: str
+    patient_id: str | None = None
+    date: _date | None = None
+    diagnosis: str | None = None
+    prescription: str | None = None
+    notes: str | None = None
+    fees_paid: float | None = None
+    fees_pending: float | None = None
+    follow_up_date: _date | None = None
+
 class VisitManager:
     def __init__(self, database: Database):
         self.database = database
 
         try:
-            self._repo: VisitRepository = self.database.visit_repo
+            self._repo: VisitRepository = self.database.visit_repository
 
         except DatabaseDisconnectedError as exc:
             raise VMDatabaseError(exc) from exc
@@ -96,7 +108,6 @@ class VisitManager:
             raise VMDuplicateEntryError() from exc
 
         else:
-            self._repo.commit()
             return visit.id
 
     def delete(self, visit_id: str):
@@ -109,28 +120,12 @@ class VisitManager:
         except DatabaseAbsentEntryError as exc:
             raise VMAbsentEntryError() from exc
 
-        else:
-            self._repo.commit()
-
     def deleteall(self, patient_id: str):
         try:
             self._repo.deleteall(patient_id)
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
             raise VMDatabaseError(exc) from exc
-
-        else:
-            self._repo.commit()
-
-    def clear(self):
-        try:
-            self._repo.clear()
-
-        except (DatabaseCursorError, DatabaseExecutionError) as exc:
-            raise VMDatabaseError(exc) from exc
-
-        else:
-            self._repo.commit()
 
     def get(self, visit_id: str) -> VisitManagerGetResult | None:
         try:
@@ -144,8 +139,8 @@ class VisitManager:
     def getall(
         self,
         patient_id: str | None = None,
-        size: int | None = None,
-        offset: int | None = None,
+        size: int = 0,
+        offset: int = 0,
         fees_pending: bool | None = None,
         follow_up: bool | None = None
     ) -> list[VisitManagerGetResult]:
@@ -156,11 +151,64 @@ class VisitManager:
                         patient_id = patient_id,
                         size = size,
                         offset = offset,
-                        fees_pending = fees_pending,
-                        follow_up = follow_up
+                        is_fees_pending = fees_pending,
+                        is_follow_up_scheduled = follow_up
                     )
                 )
             ]
+
+        except (DatabaseCursorError, DatabaseExecutionError) as exc:
+            raise VMDatabaseError(exc) from exc
+
+    def getids(self, patient_id: str) -> list[str]:
+        try:
+            return self._repo.getids(patient_id)
+
+        except (DatabaseCursorError, DatabaseExecutionError) as exc:
+            raise VMDatabaseError(exc) from exc
+
+    def getfields(
+        self,
+        visit_id: str,
+        patient_id: bool = False,
+        date: bool = False,
+        diagnosis: bool = False,
+        prescription: bool = False,
+        notes: bool = False,
+        fees_paid: bool = False,
+        fees_pending: bool = False,
+        follow_up_date: bool = False
+    ) -> VisitManagerGetFieldsResult | None:
+        if not visit_id:
+            return None
+
+        try:
+            data = self._repo.getfields(
+                visit_id = visit_id,
+                patient_id = patient_id,
+                date = date,
+                diagnosis = diagnosis,
+                prescription = prescription,
+                notes = notes,
+                fees_paid = fees_paid,
+                fees_pending = fees_pending,
+                follow_up_date = follow_up_date
+            )
+
+            if data is None:
+                return None
+
+            return VisitManagerGetFieldsResult(
+                id = data.id,
+                patient_id = data.patient_id,
+                date = data.date,
+                diagnosis = data.diagnosis,
+                prescription = data.prescription,
+                notes = data.notes,
+                fees_paid = data.fees_paid,
+                fees_pending = data.fees_pending,
+                follow_up_date = data.follow_up_date
+            )
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
             raise VMDatabaseError(exc) from exc
@@ -185,20 +233,16 @@ class VisitManager:
                 follow_up_date = follow_up_date
             )
 
-            visit = self.get(visit_id)
-
-            if visit is None:
-                raise VMAbsentEntryError()
-
-            visit.date = date if date else visit.date
-            visit.diagnosis = diagnosis if diagnosis is not None else visit.diagnosis
-            visit.prescription = prescription if prescription is not None else visit.prescription
-            visit.notes = notes if notes is not None else visit.notes
-            visit.fees_paid = fees_paid if fees_paid is not None else visit.fees_paid
-            visit.fees_pending = fees_pending if fees_pending is not None else visit.fees_pending
-            visit.follow_up_date = follow_up_date if follow_up_date else visit.follow_up_date
-
-            self._repo.update(visit)
+            self._repo.update(
+                visit_id = visit_id,
+                date = date,
+                diagnosis = diagnosis,
+                prescription = prescription,
+                notes = notes,
+                fees_paid = fees_paid,
+                fees_pending = fees_pending,
+                follow_up_date = follow_up_date
+            )
 
         except (DatabaseCursorError, DatabaseExecutionError) as exc:
             raise VMDatabaseError(exc) from exc
@@ -206,18 +250,9 @@ class VisitManager:
         except DatabaseAbsentEntryError as exc:
             raise VMAbsentEntryError() from exc
 
-    def exists(self, visit_id: str) -> bool:
-        try:
-            return self._repo.exists(visit_id)
-
-        except (DatabaseCursorError, DatabaseExecutionError) as exc:
-            raise VMDatabaseError(exc) from exc
-
-    def create_id(self) -> str:
+    def genid(self) -> str:
         visit_id = generate_id(length = self._id_len)
-
         self._reserved_ids.append(visit_id)
-
         return visit_id
 
 visit_manager: VisitManager | None = None

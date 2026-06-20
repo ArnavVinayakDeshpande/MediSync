@@ -1,5 +1,4 @@
 """
-
 """
 
 from datetime import date, datetime
@@ -54,7 +53,8 @@ class WhatsAppTemplateRepository:
 
         self._collection.create_index(
             [
-                "name", "language"
+                ("name", 1),
+                ("language", 1)
             ],
             unique = True
         )
@@ -221,7 +221,7 @@ class WhatsAppTemplateRepository:
                         **({"footer": {"$ne": None} if has_footer else None} if has_footer is not None else {}),
                         **({"approval_status": approval_status.value} if approval_status is not None else {}),
                         **({"status": status.value} if status is not None else {}),
-                        **({"approval_status": WhatsAppTemplateApprovalStatus.APPROVED if is_approved else {"$ne": WhatsAppTemplateApprovalStatus.APPROVED}} if is_approved is not None else {}),
+                        **({"approval_status": WhatsAppTemplateApprovalStatus.APPROVED.value if is_approved else {"$ne": WhatsAppTemplateApprovalStatus.APPROVED.value}} if is_approved is not None else {}),
                         **({"created_on": {"$gte": co_start, "$lt": co_end}} if created_on is not None else {}),
                         **({"variables": {"$ne": []} if has_variables else []} if has_variables is not None else {})
                         
@@ -317,6 +317,42 @@ class WhatsAppTemplateRepository:
         except PyMongoError as exc:
             raise DatabaseExecutionError(exc) from exc
 
-    def update(self):
-        pass
+    def update(
+        self,
+        template_id: str,
+        set_header: bool = False,
+        set_footer: bool = False,
+        set_status: bool = False,
+        category: WhatsAppTemplateCategory | None = None,
+        header: str | None = None,
+        footer: str | None = None,
+        approval_status: WhatsAppTemplateApprovalStatus | None = None,
+        status: WhatsAppTemplateStatus | None = None
+    ) -> None:
+        set_dict = {
+            **({"category": category.value} if category is not None else {}),
+            **({"approval_status": approval_status.value} if approval_status is not None else {}),
+            **({"header": header} if set_header else {}),
+            **({"footer": footer} if set_footer else {}),
+            **({"status": status.value if status is not None else None} if set_status else {})
+        }
+
+        if not set_dict:
+            return
+
+        try:
+            result = self._collection.update_one(
+                {
+                    "id": template_id
+                },
+                {
+                    "$set": set_dict
+                }
+            )
+
+            if result.matched_count == 0:
+                raise DatabaseAbsentEntryError()
+
+        except PyMongoError as exc:
+            raise DatabaseExecutionError(exc) from exc
 

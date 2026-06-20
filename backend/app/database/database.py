@@ -6,7 +6,7 @@ from pymongo.database import Database as MongoDB
 from app.database.exceptions import *
 from app.database.patient_repo import PatientRepository
 from app.database.visit_repo import VisitRepository 
-from app.database.wa_msg_history_repo import WhatsAppMsgHistoryRepository
+from app.database.wa_msg_history_repo import WhatsAppMessageHistoryRepository
 from app.database.wa_template_repo import WhatsAppTemplateRepository
 from app.database.client import MongoDBClient
 
@@ -20,6 +20,8 @@ class Database:
 
         self._patient_repository = PatientRepository(self._hospital_database["patients"])
         self._visit_repository = VisitRepository(self._hospital_database["visits"])
+        self._wa_msg_history_repository = WhatsAppMessageHistoryRepository(self._whatsapp_database["message_history"])
+        self._wa_template_repository = WhatsAppTemplateRepository(self._whatsapp_database["template"])
 
     @property
     def hospital_db(self) -> MongoDB:
@@ -32,6 +34,18 @@ class Database:
     @property
     def patient_repository(self) -> PatientRepository:
         return self._patient_repository
+
+    @property
+    def visit_repository(self) -> VisitRepository:
+        return self._visit_repository
+
+    @property
+    def wa_message_history_repo(self) -> WhatsAppMessageHistoryRepository:
+        return self._wa_msg_history_repository
+
+    @property
+    def wa_template_repository(self) -> WhatsAppTemplateRepository:
+        return self._wa_template_repository
 
 database: Database | None = None
 

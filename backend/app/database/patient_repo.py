@@ -1,6 +1,7 @@
 """
 """
 
+import re
 from datetime import date
 from dataclasses import dataclass
 from pymongo.collection import Collection
@@ -95,6 +96,7 @@ class PatientRepository:
         self,
         size: int = 0,
         offset: int = 0,
+        search: str | None = None,
         condition: MedicalCondition | None = None,
         is_active: bool | None = None,
         age: int | None = None
@@ -115,10 +117,18 @@ class PatientRepository:
                 "$gte": date_range[0]
             }
 
+        if search:
+            query["name"] = {
+                "$regex": f"^{re.escape(search)}",
+                "$options": "i"
+            }
+
         try:
             result = (
                 self._collection
-                .find(query)
+                .find(
+                query
+                )
                 .sort(
                     [
                         ("name", 1),

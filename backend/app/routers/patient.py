@@ -100,24 +100,7 @@ def getid():
         )
 
     try:
-        return pm.patient_manager.create_id()
-
-    except PMDatabaseError as exc:
-        raise HTTPException(
-            status_code = 500,
-            detail = str(exc)
-        ) from exc
-
-@router.get("/ids")
-def get_all_ids():
-    if pm.patient_manager is None:
-        raise HTTPException(
-            status_code = 500,
-            detail = "Patient Manager has not been initialized."
-        )
-
-    try:
-        return pm.patient_manager.get_all_ids()
+        return pm.patient_manager.genid()
 
     except PMDatabaseError as exc:
         raise HTTPException(
@@ -154,8 +137,8 @@ def get(patient_id: str):
 # Get all patients
 @router.get("")
 def getall(
-    size: int | None = Query(default = None),
-    offset: int | None = Query(default = None),
+    size: int = Query(default = 0),
+    offset: int = Query(default = 0),
     search: str | None = Query(default = None),
     condition: str | None = Query(default = None),
     active: bool | None = Query(default = None),

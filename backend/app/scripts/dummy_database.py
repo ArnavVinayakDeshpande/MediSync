@@ -7,7 +7,8 @@ Usage:
 
 import random
 from datetime import date, timedelta
-from pathlib import Path
+from dotenv import load_dotenv
+from os import getenv
 
 from app.models.patient import Patient
 from app.models.medical_condition import MedicalCondition
@@ -15,6 +16,7 @@ from app.models.visit import Visit
 from app.database.database import Database
 from app.managers.patient_manager import PatientManager
 from app.managers.visit_manager import VisitManager
+from app.database.client import MongoDBClient
 
 
 FIRST_NAMES = [
@@ -87,16 +89,24 @@ def create_dummy_patient(pid: str) -> Patient:
 
 
 def main():
-    database_path = Path(__file__).parent.parent.parent.parent / "data" / "lenest_database.db"
-    print(f"Creating a database: {database_path}")
-    database = Database(database_path)
+    # Get the username and password
+    username = getenv("MONGODB_USERNAME")
+    password = getenv("MONGODB_PASSWORD")
+
+    if not username or not password:
+        raise Exception("Invalid .env file.")
+
+    # Create the client
+    mongodb_client = MongoDBClient(username = username, password = password)
+    
+    database = Database(mongodb_client)
     manager = PatientManager(database)
 
     for _ in range(1000):
-        patient = create_dummy_patient(manager.create_id())
+        patient = create_dummy_patient(manager.genid())
         manager.create(patient)
 
-
 if __name__ == "__main__":
+    load_dotenv()
     main()
 

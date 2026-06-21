@@ -39,7 +39,13 @@ def create(data: dict = Body(...)):
             visit = visit_from_json_fmt(data)
         )
         
-        patient_name = pm.patient_manager.get_name(data["patient_id"])
+        patient_fields= pm.patient_manager.getfields(data["patient_id"], name = True)
+
+        if patient_fields is None:
+            raise HTTPException(
+                status_code = 404,
+                detail = "Patient manager does not have an entry for the corresponding patient name."
+            )
 
         # Patient name will definitely be not None, since if patient does not exist then 
         # visit_manager will throw exception
@@ -47,7 +53,7 @@ def create(data: dict = Body(...)):
         return {
             "sucess": True,
             "visit_id": created_id,
-            "patient_name": patient_name
+            "patient_name": patient_fields.name
         }
 
     except VMDuplicateEntryError as exc:
@@ -131,7 +137,7 @@ def getid():
         )
 
     try:
-        return vm.visit_manager.create_id()
+        return vm.visit_manager.genid()
 
     except VMDatabaseError as exc:
         raise HTTPException(
@@ -162,9 +168,9 @@ def get(visit_id: str):
                 detail = "The requested visit does not exist."
             )
 
-        patient_name = pm.patient_manager.get_name(data.patient_id)
+        patient_fields = pm.patient_manager.getfields(data.patient_id, name = True)
 
-        if patient_name is None:
+        if patient_fields is None or patient_fields.name is None:
             raise HTTPException(
                 status_code = 500,
                 detail = "Issue detected! Internal database might be corrupted."
@@ -173,7 +179,7 @@ def get(visit_id: str):
         return visit_to_json_fmt(
             visit = data.visit,
             patient_id = data.patient_id,
-            patient_name = patient_name
+            patient_name = patient_fields.name 
         )
 
     except VMDatabaseError as exc:
@@ -185,8 +191,8 @@ def get(visit_id: str):
 @router.get("")
 def getall(
     patient_id: str | None = Query(default = None),
-    size: int | None = Query(default = None),
-    offset: int | None = Query(default = None),
+    size: int = Query(default = 0),
+    offset: int = Query(default = 0),
     fees_pending: bool | None = Query(default = None),
     follow_up: bool | None = Query(default = None)
 ):
@@ -211,14 +217,24 @@ def getall(
             follow_up
         )
 
+        patient_fields= [
+            pm.patient_manager.getfields(visit.patient_id, name = True) for visit in data
+        ]
+
+        if any(patient_field is None for patient_field in patient_fields):
+            raise HTTPException(
+                status_code = 500,
+                detail = "Issue Detected! Internal database might be corrupted."
+            )
+
         patient_names = [
-            pm.patient_manager.get_name(visit.patient_id) for visit in data
+            patient_field.name for patient_field in patient_fields # pyright: ignore[reportOptionalMemberAccess]
         ]
 
         if any(patient_name is None for patient_name in patient_names):
             raise HTTPException(
                 status_code = 500,
-                detail = "Issue Detected! Internal database might be corrupted."
+                detail = "Issue Detected! Internal database might be corrputed."
             )
 
         return [
@@ -234,6 +250,51 @@ def getall(
             status_code = 500,
             detail = str(exc)
         ) from exc
+
+@router.get("/{visit_id}/fields")
+def getfields(
+    visit_id: str,
+    patient_id: bool = Query(default = False),
+    date: bool = Query(default = False),
+    diagnosis: bool = Query(default = False),
+    prescription: bool = Query(default = False),
+    notes: bool = Query(default = False),
+    fees_paid: bool = Query(default = False),
+    fees_pending: bool = Query(default = False),
+    follow_up_date: bool = Query(default = False)
+):
+    if vm.visit_manager is None:
+        raise HTTPException(
+            status_code = 500,
+            detail = "Visit Manager has not been initialized."
+        )
+
+    try:
+        data = vm.visit_manager.getfields(
+            visit_id = visit_id,
+            patient_id = patient_id,
+            date = date,
+            diagnosis = diagnosis,
+            prescription = prescription,
+            notes = notes,
+            fees_paid = fees_paid,
+            fees_pending = fees_pending,
+            follow_up_date = follow_up_date
+        )
+
+        if data is None:
+            raise HTTPException(
+                status_code = 404,
+                detail = "Could not find the given visit."
+            )
+
+        return vm_get_fields_result_to_json_fmt(data)
+
+    except VMDatabaseError as exc:
+        raise HTTPException(
+            status_code = 500,
+            detail = str(exc)
+        )
 
 @router.patch("/{visit_id}")
 def update(visit_id: str, data: dict = Body(...)):

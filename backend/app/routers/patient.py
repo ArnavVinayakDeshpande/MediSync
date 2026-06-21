@@ -110,7 +110,7 @@ def getid():
 
 # Get single patient
 @router.get("/{patient_id}")
-def get(patient_id: str):
+def get(patient_id: str): 
     if pm.patient_manager is None:
         raise HTTPException(
             status_code = 500,
@@ -168,6 +168,44 @@ def getall(
             detail = str(exc)
         ) from exc
 
+@router.get("/{patient_id}/fields")
+def getfields(
+    patient_id: str,
+    name: bool = Query(default = False),
+    dob: bool = Query(default = False),
+    number: bool = Query(default = False),
+    condition: bool = Query(default = False),
+    is_active: bool = Query(default = False)
+):
+    if pm.patient_manager is None:
+        raise HTTPException(
+            status_code = 500,
+            detail = "Patient Manager has not been initialized."
+        )
+
+    try:
+        data = pm.patient_manager.getfields(
+            patient_id = patient_id,
+            name = name,
+            dob = dob,
+            number = number,
+            condition = condition,
+            is_active = is_active
+        )
+
+        if data is None:
+            raise HTTPException(
+                status_code = 404,
+                detail = "The requested patient does not exist."
+            )
+
+        return pm_get_fields_result_to_json_fmt(data)
+
+    except PMDatabaseError as exc:
+        raise HTTPException(
+            status_code = 500,
+            detail = str(exc)
+        )
 
 # Update
 @router.patch("/{patient_id}")

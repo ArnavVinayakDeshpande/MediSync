@@ -18,6 +18,12 @@ from app.communication.whatsapp.template import (
     WhatsAppTemplateStatus,
     WhatsAppTemplate
 )
+from app.managers.patient_manager import (
+    PatientManagerGetFieldsResult
+)
+from app.managers.visit_manager import (
+    VisitManagerGetFieldsResult
+)
 
 
 # DB 
@@ -212,6 +218,54 @@ def visit_from_json_fmt(data: dict) -> Visit:
         fees_paid = data["fees_paid"],
         fees_pending = data["fees_pending"],
         follow_up_date = date_from_json_fmt(data["follow_up_date"])
+    )
+
+def pm_get_fields_result_to_json_fmt(fields: PatientManagerGetFieldsResult) -> dict:
+    return {
+        "id": fields.id,
+        "name": fields.name,
+        "dob": date_to_json_fmt(fields.dob),
+        "number": fields.number,
+        "condition": fields.condition.value if fields.condition is not None else None,
+        "is_active": fields.is_active
+    }
+
+def pm_get_fields_result_from_json_fmt(fields: dict) -> PatientManagerGetFieldsResult:
+    return PatientManagerGetFieldsResult(
+        id = fields["id"],
+        name = fields.get("name"),
+        dob = date_from_json_fmt(fields.get("dob")),
+        number = fields.get("number"),
+        condition = MedicalCondition(fields.get("condition")) if fields.get("condition") is not None else None,
+        is_active = fields.get("is_active")
+    )
+
+def vm_get_fields_result_to_json_fmt(fields: VisitManagerGetFieldsResult) -> dict:
+    return {
+        "id": fields.id,
+        "patient": {
+            "id": fields.patient_id
+        },
+        "date": date_to_json_fmt(fields.date),
+        "diagnosis": fields.diagnosis,
+        "prescription": fields.prescription,
+        "notes": fields.notes,
+        "fees_paid": fields.fees_paid,
+        "fees_pending": fields.fees_pending,
+        "follow_up_date": date_to_json_fmt(fields.follow_up_date)
+    }
+
+def vm_get_fields_result_from_json_fmt(fields: dict) -> VisitManagerGetFieldsResult:
+    return VisitManagerGetFieldsResult(
+        id = fields["id"],
+        patient_id = fields["patient"]["id"],
+        date = date_from_json_fmt(fields["date"]),
+        diagnosis = fields["diagnosis"],
+        prescription = fields["prescription"],
+        notes = fields["notes"],
+        fees_paid = fields["fees_paid"],
+        fees_pending = fields["fees_pending"],
+        follow_up_date = date_from_json_fmt(fields["date"])
     )
 
 # Helper
